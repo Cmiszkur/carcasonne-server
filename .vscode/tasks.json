@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "start:dev",
+			"problemMatcher": [],
+			"label": "npm: start:dev",
+			"detail": "nest start --watch"
+		},
+		{
+			"type": "npm",
+			"script": "start",
+			"problemMatcher": [],
+			"label": "npm: start",
+			"detail": "ng serve"
+		},
+		{
+			"label": "Start both",
+			"dependsOn": ["npm: start", "npm: start:dev"]
+		}
+	]
+}
