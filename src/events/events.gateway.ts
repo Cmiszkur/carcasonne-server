@@ -1,29 +1,65 @@
+import { UseGuards } from '@nestjs/common';
 import {
   OnGatewayConnection,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
+import { WsAuthenticatedGuard } from 'src/auth/ws.authenticated.guard';
+import crypto = require('crypto');
+import RoomService from './services/room.service';
+import { IncomingMessage } from 'http';
+import { User } from 'src/users/schemas/user.schema';
 
 @WebSocketGateway(80, {
   cors: {
     origin: 'http://localhost:4200',
+    credentials: true,
   },
 })
 export class EventsGateway implements OnGatewayConnection {
+  constructor(private roomService: RoomService) {}
+
   @WebSocketServer()
   server: Server;
 
+  @UseGuards(WsAuthenticatedGuard)
   @SubscribeMessage('message')
-  handleMessage(client: any, payload: any): string {
+  handleMessage(client: ExtendedSocket, payload: any): void {
     console.log(payload);
     console.log(client.username);
     client.emit('answer', 'Hello client');
-    return payload;
   }
 
-  handleConnection(client: any, ...args: any[]) {
-    client.username = 'Cyprian';
+  @UseGuards(WsAuthenticatedGuard)
+  @SubscribeMessage('create_room')
+  async handleRoomCreate(client: ExtendedSocket, payload: any): Promise<void> {
+    const roomID = crypto.randomBytes(20).toString('hex');
+    const host = client.username;
+    const color = 'green';
+    const createdRoom = await this.roomService.roomCreate(host, roomID, color);
+    client.emit('created_room_response', createdRoom);
   }
+
+  handleConnection(client: ExtendedSocket, ...args: any[]) {
+    console.log('user connected');
+    const username = client.request?.user?.username;
+    client.username = username;
+  }
+}
+
+export interface ExtendedSocket extends Socket {
+  username: string | undefined;
+  request: ExtendedIncomingMessage;
+}
+
+interface ExtendedIncomingMessage extends IncomingMessage {
+  user: RequestUser | undefined;
+}
+
+interface RequestUser {
+  name: string;
+  email: string;
+  username: string;
 }

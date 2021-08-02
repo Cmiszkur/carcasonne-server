@@ -9,7 +9,6 @@ import { EventsModule } from './events/events.module';
 @Module({
   imports: [
     AuthModule,
-    EventsModule,
     UsersModule,
     ConfigModule.forRoot({
       envFilePath: '.env',
