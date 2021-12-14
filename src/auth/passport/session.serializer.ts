@@ -1,5 +1,5 @@
-import { UsersService } from './../users/users.service';
-import { User, UserDocument } from './../users/schemas/user.schema';
+import { UsersService } from './../../users/users.service';
+import { User, UserDocument } from './../../users/schemas/user.schema';
 import { Injectable } from '@nestjs/common';
 import { PassportSerializer } from '@nestjs/passport';
 

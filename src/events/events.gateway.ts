@@ -6,11 +6,10 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { WsAuthenticatedGuard } from 'src/auth/ws.authenticated.guard';
+import { WsAuthenticatedGuard } from 'src/auth/guards/ws.authenticated.guard';
 import crypto = require('crypto');
 import RoomService from './services/room.service';
 import { IncomingMessage } from 'http';
-import { User } from 'src/users/schemas/user.schema';
 
 @WebSocketGateway(80, {
   cors: {
@@ -18,13 +17,13 @@ import { User } from 'src/users/schemas/user.schema';
     credentials: true,
   },
 })
+@UseGuards(WsAuthenticatedGuard)
 export class EventsGateway implements OnGatewayConnection {
   constructor(private roomService: RoomService) {}
 
   @WebSocketServer()
   server: Server;
 
-  @UseGuards(WsAuthenticatedGuard)
   @SubscribeMessage('message')
   handleMessage(client: ExtendedSocket, payload: any): void {
     console.log(payload);
@@ -32,7 +31,6 @@ export class EventsGateway implements OnGatewayConnection {
     client.emit('answer', 'Hello client');
   }
 
-  @UseGuards(WsAuthenticatedGuard)
   @SubscribeMessage('create_room')
   async handleRoomCreate(client: ExtendedSocket, payload: any): Promise<void> {
     const roomID = crypto.randomBytes(20).toString('hex');
