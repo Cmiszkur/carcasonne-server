@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { Tile } from './tile.schema';
+import { ExtendedTile } from 'src/models/tiles/tilesModels';
 
 export type RoomDocument = Room & Document;
 
@@ -21,14 +22,8 @@ export class Room {
   })
   players: { username: string; color: string; followers: number }[];
 
-  @Prop({
-    type: {
-      tiles: { type: [mongoose.Schema.Types.ObjectId], ref: 'Tile' },
-    },
-  })
-  board: {
-    tiles: Tile[];
-  };
+  @Prop()
+  board: ExtendedTile[];
 
   @Prop({
     type: {
@@ -43,6 +38,9 @@ export class Room {
 
   @Prop()
   gameStarted: boolean;
+
+  @Prop()
+  gameEnded: boolean;
 
   @Prop()
   roomId: string;

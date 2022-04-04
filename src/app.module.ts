@@ -14,7 +14,7 @@ import { EventsModule } from './events/events.module';
       envFilePath: '.env',
       isGlobal: true,
     }),
-    MongooseModule.forRoot(process.env.MONGO_URI),
+    MongooseModule.forRoot(process.env.MONGO_URI || ''),
     EventsModule,
   ],
   controllers: [AppController],

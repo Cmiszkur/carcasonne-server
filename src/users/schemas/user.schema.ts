@@ -23,6 +23,9 @@ export class User {
   @Prop()
   currentHashedRefreshToken?: string;
 
+  @Prop()
+  lastCreatedRoom?: string;
+
   constructor(partial: Partial<User>) {
     Object.assign(this, partial);
   }

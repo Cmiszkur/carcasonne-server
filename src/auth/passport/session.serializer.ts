@@ -1,5 +1,5 @@
 import { UsersService } from './../../users/users.service';
-import { User, UserDocument } from './../../users/schemas/user.schema';
+import { UserDocument } from './../../users/schemas/user.schema';
 import { Injectable } from '@nestjs/common';
 import { PassportSerializer } from '@nestjs/passport';
 
@@ -9,10 +9,8 @@ export class SessionSerializer extends PassportSerializer {
     super();
   }
 
-  serializeUser(
-    user: UserDocument,
-    done: (err: Error, user: any) => void,
-  ): any {
+  serializeUser(user: UserDocument, done: (err: Error, user: any) => void): any {
+    //@ts-ignore
     done(null, user._id);
   }
   deserializeUser(id: any, done: (err: Error, payload: string) => void): any {

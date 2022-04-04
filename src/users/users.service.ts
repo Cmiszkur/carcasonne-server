@@ -2,7 +2,7 @@ import { RegisterResponse } from './../interfaces';
 import { User, UserDocument } from './schemas/user.schema';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, UpdateWriteOpResult } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -30,10 +30,7 @@ export class UsersService {
           !createUser.password ||
           !createUser.username
         ) {
-          throw new HttpException(
-            'Invalid credentials',
-            HttpStatus.BAD_REQUEST,
-          );
+          throw new HttpException('Invalid credentials', HttpStatus.BAD_REQUEST);
         }
         bcrypt.genSalt(this.saltRounds, (err, salt) => {
           if (err) throw new Error(err);
@@ -43,10 +40,7 @@ export class UsersService {
             const createdUser = new this.userModel(createUser);
             createdUser.save((err) => {
               if (err) {
-                throw new HttpException(
-                  'Database error',
-                  HttpStatus.INTERNAL_SERVER_ERROR,
-                );
+                throw new HttpException('Database error', HttpStatus.INTERNAL_SERVER_ERROR);
               }
             });
           });
@@ -56,38 +50,44 @@ export class UsersService {
     return new User(createUser);
   }
 
-  async setCurrentRefreshToken(refreshToken: string, username: string) {
-    const currentHashedRefreshToken = await bcrypt.hash(
-      refreshToken,
-      this.saltRounds,
-    );
-    await this.userModel
-      .findOneAndUpdate(
-        { username: username },
-        { currentHashedRefreshToken: currentHashedRefreshToken },
-      )
-      .lean();
-  }
+  // async setCurrentRefreshToken(refreshToken: string, username: string) {
+  //   const currentHashedRefreshToken = await bcrypt.hash(
+  //     refreshToken,
+  //     this.saltRounds,
+  //   );
+  //   await this.userModel
+  //     .findOneAndUpdate(
+  //       { username: username },
+  //       { currentHashedRefreshToken: currentHashedRefreshToken },
+  //     )
+  //     .lean();
+  // }
 
-  async getUserIfRefreshTokenMatches(refreshToken: string, username: string) {
-    const user = await this.findOne(username);
-    const isRefreshTokenMatching = await bcrypt.compare(
-      refreshToken,
-      user.currentHashedRefreshToken,
-    );
+  // async getUserIfRefreshTokenMatches(refreshToken: string, username: string) {
+  //   const user = await this.findOne(username);
+  //   const isRefreshTokenMatching = await bcrypt.compare(
+  //     refreshToken,
+  //     user.currentHashedRefreshToken,
+  //   );
 
-    if (isRefreshTokenMatching) {
-      return user;
-    }
-  }
+  //   if (isRefreshTokenMatching) {
+  //     return user;
+  //   }
+  // }
 
   async findOne(username: string): Promise<User> {
     return this.userModel.findOne({ username: username }).select('-__v').lean();
   }
 
   findById(id: string, cb: any) {
-    return this.userModel
-      .findById(id, cb)
-      .select('-_id -__v -password -currentHashedRefreshToken');
+    return this.userModel.findById(id, cb).select('-_id -__v -password -currentHashedRefreshToken');
+  }
+
+  async checkIfRoomCreatedByUser(username: string): Promise<string | null> {
+    return (await this.findOne(username)).lastCreatedRoom || null;
+  }
+
+  async updateUser(username: string, userPayload: Partial<User>): Promise<UpdateWriteOpResult> {
+    return this.userModel.updateOne({ username: username }, userPayload);
   }
 }
