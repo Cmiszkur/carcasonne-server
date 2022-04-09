@@ -64,8 +64,6 @@ export class TilesService {
       [4, Position.TOP],
     ]);
 
-    //TODO: zrobić pętle wokół coordinatesToCheck.
-
     coordinatesToCheck.forEach((coordinates: Coordinates, coordinatesIndex: number) => {
       uncheckedTiles.forEach((tileToCheck: ExtendedTile, index: number) => {
         if (tileToCheck.coordinates.x === coordinates.x && tileToCheck.coordinates.y === coordinates.y) {
@@ -106,7 +104,7 @@ export class TilesService {
       for (const [environment, positionsInTileValues] of Object.entries(tileToCheckValues)) {
         const positionsInTileValuesFlat: Position[] = positionsInTileValues.flat();
         if (oppositePosition && positionsInTileValuesFlat.indexOf(oppositePosition) !== -1) {
-          isOK = tileValuesFlat[environment].indexOf(position) !== -1;
+          isOK = tileValuesFlat[environment as keyof TileValuesFlat].indexOf(position) !== -1;
         }
       }
     }

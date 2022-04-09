@@ -1,8 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { BoardMove, Player } from '@roomModels';
+import { ExtendedTile } from '@tileModels';
 import { Document } from 'mongoose';
-import * as mongoose from 'mongoose';
 import { Tile } from './tile.schema';
-import { ExtendedTile } from 'src/models/tiles/tilesModels';
 
 export type RoomDocument = Room & Document;
 
@@ -20,21 +20,27 @@ export class Room {
       },
     ],
   })
-  players: { username: string; color: string; followers: number }[];
+  players: Player[];
 
   @Prop()
   board: ExtendedTile[];
 
   @Prop({
-    type: {
-      moveCounter: Number,
-      player: String,
-    },
+    type: [
+      {
+        player: String || null,
+        moveState: String,
+        coordinates: { x: Number, y: Number } || null,
+      },
+    ],
   })
-  boardMoves: { moveCounter: number; player: string };
+  boardMoves: BoardMove[];
 
-  // @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Tile' })
-  // tilesLeft: Tile[];
+  @Prop()
+  lastChosenTile: Tile[];
+
+  @Prop()
+  tilesLeft: Tile[];
 
   @Prop()
   gameStarted: boolean;

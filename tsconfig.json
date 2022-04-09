@@ -12,9 +12,16 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
+    "noImplicitReturns": true,
+    "pretty": true,
     "strictNullChecks": true,
     "lib": [
       "es2019"
-    ]
+    ],
+    "paths": {
+      "@roomModels": ["src/models/room/roomModels"],
+      "@socketModels": ["src/models/socket/socketModels"],
+      "@tileModels": ["src/models/tiles/tilesModels"]
+    }
   }
 }
