@@ -1,3 +1,5 @@
+import { BasicService } from './services/basic.service';
+import { GameService } from './services/game.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Module } from '@nestjs/common';
 import { EventsGateway } from './events.gateway';
@@ -9,7 +11,7 @@ import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { TilesService } from './services/tiles.service';
 
 @Module({
-  providers: [EventsGateway, RoomService, UsersService, TilesService],
+  providers: [EventsGateway, RoomService, UsersService, TilesService, GameService, BasicService],
   imports: [
     MongooseModule.forFeature([
       { name: Room.name, schema: RoomSchema },

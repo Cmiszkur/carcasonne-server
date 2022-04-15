@@ -18,18 +18,22 @@ export interface RequestUser {
   username: string;
 }
 
-export interface JoinRoomPayload {
-  roomId: string;
+export interface JoinRoomPayload extends BasePayload {
   color: string;
 }
 
-export interface GetNewTilePayload {
-  roomId: string;
+export interface StartGamePayload extends BasePayload {
+  username: string;
 }
 
-export interface CheckTilePayload {
-  roomID: string;
+export type GetNewTilePayload = BasePayload;
+
+export interface CheckTilePayload extends BasePayload {
   coordinates: Coordinates;
   tileValues: TileValues;
   rotation: number;
+}
+
+export interface BasePayload {
+  roomID: string;
 }

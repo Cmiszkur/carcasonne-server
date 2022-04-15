@@ -2,7 +2,7 @@ import { Coordinates } from 'src/models/tiles/tilesModels';
 import { Room } from 'src/events/schemas/room.schema';
 import { Tile } from 'src/events/schemas/tile.schema';
 
-export interface RoomCreateAnswer {
+export interface SocketAnswer {
   error: RoomError | null;
   answer: Answer | null;
   errorMessage?: string;
@@ -13,9 +13,9 @@ export interface Answer {
   tile: Tile | null;
 }
 
-export interface StartingTilesSet {
+export interface TilesSet {
   allTiles: Tile[];
-  startingTile: Tile;
+  drawnTile: Tile | null;
 }
 
 export enum MoveState {
@@ -43,4 +43,9 @@ export enum RoomError {
   PLAYER_ALREADY_IN_THE_ROOM = 'Player already in the room',
   NO_STARTING_TILE_FOUND = 'No starting tile found',
   GAME_HAS_ALREADY_STARTED = 'Game has already started',
+}
+
+export interface TileAndPlayer {
+  tile: Tile;
+  player: string;
 }

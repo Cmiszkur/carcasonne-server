@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { BoardMove, Player } from '@roomModels';
+import { BoardMove, Player, TileAndPlayer } from '@roomModels';
 import { ExtendedTile } from '@tileModels';
 import { Document } from 'mongoose';
 import { Tile } from './tile.schema';
@@ -37,7 +37,7 @@ export class Room {
   boardMoves: BoardMove[];
 
   @Prop()
-  lastChosenTile: Tile[];
+  lastChosenTile: TileAndPlayer[];
 
   @Prop()
   tilesLeft: Tile[];
