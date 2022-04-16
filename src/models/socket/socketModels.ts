@@ -1,4 +1,4 @@
-import { Coordinates, TileValues } from '@tileModels';
+import { Coordinates, ExtendedTile, TileValues } from '@tileModels';
 import { IncomingMessage } from 'http';
 import { Socket } from 'socket.io';
 
@@ -32,6 +32,10 @@ export interface CheckTilePayload extends BasePayload {
   coordinates: Coordinates;
   tileValues: TileValues;
   rotation: number;
+}
+
+export interface PlacedTilePayload extends BasePayload {
+  extendedTile: ExtendedTile;
 }
 
 export interface BasePayload {

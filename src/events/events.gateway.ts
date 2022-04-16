@@ -6,7 +6,14 @@ import { WsAuthenticatedGuard } from 'src/auth/guards/ws.authenticated.guard';
 import crypto = require('crypto');
 import RoomService from './services/room.service';
 import { TilesService } from './services/tiles.service';
-import { CheckTilePayload, ExtendedSocket, GetNewTilePayload, JoinRoomPayload, StartGamePayload } from '@socketModels';
+import {
+  CheckTilePayload,
+  ExtendedSocket,
+  GetNewTilePayload,
+  JoinRoomPayload,
+  PlacedTilePayload,
+  StartGamePayload,
+} from '@socketModels';
 import { SocketAnswer } from '@roomModels';
 import { RoomError } from '../models/room/roomModels';
 
@@ -85,10 +92,16 @@ export class EventsGateway implements OnGatewayConnection {
     this.server.to(payload.roomID).emit('game_started', startedRoomAnswer);
   }
 
-  // @SubscribeMessage('tile_placed')
-  // handleTilePlace(client: ExtendedSocket, payload: unknown): void {
-  //   console.log('tile_placed');
-  // }
+  @SubscribeMessage('tile_placed')
+  async handleTilePlace(client: ExtendedSocket, payload: PlacedTilePayload): Promise<void> {
+    const roomID: string = payload.roomID;
+    const placedTileRoomAnswer: SocketAnswer = await this.gameService.placeTile(client.username, roomID, payload.extendedTile);
+    if (placedTileRoomAnswer.error === null) {
+      this.server.to(roomID).emit('tile_placed_new_tile_distributed', placedTileRoomAnswer);
+    } else {
+      client.emit('tile_placed_new_tile_distributed', placedTileRoomAnswer);
+    }
+  }
 
   handleConnection(client: ExtendedSocket): void {
     const username = client.request.user.username;

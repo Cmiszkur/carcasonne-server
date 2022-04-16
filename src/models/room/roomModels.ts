@@ -25,7 +25,6 @@ export enum MoveState {
 
 export interface BoardMove {
   player: string | null;
-  moveState: MoveState;
   coordinates: Coordinates | null;
 }
 
@@ -43,6 +42,7 @@ export enum RoomError {
   PLAYER_ALREADY_IN_THE_ROOM = 'Player already in the room',
   NO_STARTING_TILE_FOUND = 'No starting tile found',
   GAME_HAS_ALREADY_STARTED = 'Game has already started',
+  PLACEMENT_NOT_CORRECT = 'Tile placement is not correct',
 }
 
 export interface TileAndPlayer {

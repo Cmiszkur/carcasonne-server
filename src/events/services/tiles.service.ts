@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Coordinates, ExtendedTile, Position, TileEnvironments, TileValues, TileValuesFlat } from 'src/models/tiles/tilesModels';
+import { Coordinates, ExtendedTile, Position, TileValues, TileValuesFlat } from 'src/models/tiles/tilesModels';
 import { Room, RoomDocument } from '../schemas/room.schema';
 import { Tile, TileDocument } from '../schemas/tile.schema';
 
@@ -12,13 +12,33 @@ export class TilesService {
     @InjectModel(Tile.name) private tileModel: Model<TileDocument>,
   ) {}
 
-  public async checkTile(roomID: string, coordinates: Coordinates, tileValues: TileValues, rotation: number): Promise<boolean> {
-    const uncheckedTiles: ExtendedTile[] = (await this.roomModel.findOne({ roomId: roomID }).lean())?.board || [];
-    const tilesWithCoordinatesToCheck: Map<Position, ExtendedTile> = this.setTilesWithCoordinatesToCheck(uncheckedTiles, coordinates);
-    const tilesValuesAfterRotation: TileValues = this.tilesValuesAfterRotation(tileValues, rotation);
-    return this.compareTileValues(tilesValuesAfterRotation, tilesWithCoordinatesToCheck);
+  public async checkTile(
+    roomID: string,
+    coordinates: Coordinates,
+    tileValues: TileValues,
+    rotation: number,
+    tilesValuesAfterRotation?: TileValues,
+    uncheckedTiles?: ExtendedTile[],
+  ): Promise<boolean> {
+    const _uncheckedTiles: ExtendedTile[] = uncheckedTiles || (await this.roomModel.findOne({ roomId: roomID }).lean())?.board || [];
+    const tilesWithCoordinatesToCheck: Map<Position, ExtendedTile> | null = this.setTilesWithCoordinatesToCheck(
+      _uncheckedTiles,
+      coordinates,
+    );
+    //this.setTilesWithCoordinatesToCheck might return null when coordinates are already taken
+    if (tilesWithCoordinatesToCheck === null) {
+      return false;
+    }
+    const _tilesValuesAfterRotation: TileValues = tilesValuesAfterRotation || this.tilesValuesAfterRotation(tileValues, rotation);
+    return this.compareTileValues(_tilesValuesAfterRotation, tilesWithCoordinatesToCheck);
   }
 
+  /**
+   * Returns tile values after rotation.
+   * @param tileValues
+   * @param rotation
+   * @returns
+   */
   private tilesValuesAfterRotation(tileValues: TileValues, rotation: number): TileValues {
     const positions: Position[] = [Position.TOP, Position.RIGHT, Position.BOTTOM, Position.LEFT];
     const rotationValueToIndexSkip: Map<number, number> = new Map<number, number>([
@@ -30,7 +50,7 @@ export class TilesService {
     const indexesToSkip: number | undefined = rotationValueToIndexSkip.get(rotation);
 
     for (const [key, positionsInTileValues] of Object.entries(tileValues)) {
-      positionsInTileValues.forEach((positionSet: Position[]) => {
+      (positionsInTileValues as [Position[]]).forEach((positionSet: Position[]) => {
         positionSet.forEach((position: Position, positionIndex: number) => {
           const indexInPositionsTable: number = positions.indexOf(position);
           if (indexesToSkip && indexInPositionsTable >= 0) {
@@ -49,7 +69,15 @@ export class TilesService {
    * @param coordinates - The coordinates of the placed tile.
    * @returns
    */
-  private setTilesWithCoordinatesToCheck(uncheckedTiles: ExtendedTile[], coordinates: Coordinates): Map<Position, ExtendedTile> {
+  private setTilesWithCoordinatesToCheck(
+    uncheckedTiles: ExtendedTile[],
+    coordinates: Coordinates,
+  ): Map<Position, ExtendedTile> | null {
+    const coordinatesAlreadyTaken: boolean =
+      uncheckedTiles.findIndex((tile) => tile.coordinates.x === coordinates.x && tile.coordinates.y === coordinates.y) >= 0;
+    if (coordinatesAlreadyTaken) {
+      return null;
+    }
     const tilesWithCoordinatesToCheck: Map<Position, ExtendedTile> = new Map<Position, ExtendedTile>();
     const coordinatesToCheck: Coordinates[] = [
       { x: coordinates.x - 1, y: coordinates.y },
@@ -65,7 +93,7 @@ export class TilesService {
     ]);
 
     coordinatesToCheck.forEach((coordinates: Coordinates, coordinatesIndex: number) => {
-      uncheckedTiles.forEach((tileToCheck: ExtendedTile, index: number) => {
+      uncheckedTiles.forEach((tileToCheck: ExtendedTile) => {
         if (tileToCheck.coordinates.x === coordinates.x && tileToCheck.coordinates.y === coordinates.y) {
           const checkedTilePosition: Position | undefined = indexToPositionValue.get(coordinatesIndex + 1);
           checkedTilePosition && tilesWithCoordinatesToCheck.set(checkedTilePosition, tileToCheck);
@@ -74,18 +102,19 @@ export class TilesService {
       });
     });
 
-    uncheckedTiles.forEach((tileToCheck: ExtendedTile, index: number) => {
-      if (tileToCheck.coordinates.x === coordinatesToCheck[index].x && tileToCheck.coordinates.y === coordinatesToCheck[index].y) {
-        const checkedTilePosition: Position | undefined = indexToPositionValue.get(index + 1);
-        checkedTilePosition && tilesWithCoordinatesToCheck.set(checkedTilePosition, tileToCheck);
-        return;
-      }
-    });
+    //TODO: Upewnić się, że poniższy kod jest do usunięcia.
+    // uncheckedTiles.forEach((tileToCheck: ExtendedTile, index: number) => {
+    //   if (tileToCheck.coordinates.x === coordinatesToCheck[index].x && tileToCheck.coordinates.y === coordinatesToCheck[index].y) {
+    //     const checkedTilePosition: Position | undefined = indexToPositionValue.get(index + 1);
+    //     checkedTilePosition && tilesWithCoordinatesToCheck.set(checkedTilePosition, tileToCheck);
+    //     return;
+    //   }
+    // });
     return tilesWithCoordinatesToCheck;
   }
 
   private compareTileValues(tileValues: TileValues, tilesWithCoordinatesToCheck: Map<Position, ExtendedTile>): boolean {
-    let isOK: boolean = false;
+    let isOK = false;
     const tileValuesFlat: TileValuesFlat = {
       cities: tileValues.cities?.flat() || [],
       roads: tileValues.roads?.flat() || [],
@@ -97,14 +126,20 @@ export class TilesService {
       [Position.RIGHT, Position.LEFT],
     ]);
 
+    //Iterates through map tilesWithCoordinatesToCheck.
     for (const [position, tileWithCoordinatesToCheck] of tilesWithCoordinatesToCheck) {
-      const oppositePosition: Position | undefined = oppositePositions.get(position as Position);
+      //Returns opposite position to one currently looped through.
+      const oppositePosition: Position | undefined = oppositePositions.get(position);
       const tileToCheckValues: TileValues = tileWithCoordinatesToCheck.tileValuesAfterRotation;
-
+      //Iterates through tileValues of checked tile.
       for (const [environment, positionsInTileValues] of Object.entries(tileToCheckValues)) {
-        const positionsInTileValuesFlat: Position[] = positionsInTileValues.flat();
+        const positionsInTileValuesFlat = (positionsInTileValues as [Position[]]).flat();
+        //Checks whether flatten tileValues in checked tiles have cities or roads
+        //on opposite position to theirs position according to placed tile coordinates.
         if (oppositePosition && positionsInTileValuesFlat.indexOf(oppositePosition) !== -1) {
           isOK = tileValuesFlat[environment as keyof TileValuesFlat].indexOf(position) !== -1;
+        } else {
+          isOK = tileValuesFlat[environment as keyof TileValuesFlat].indexOf(position) === -1;
         }
       }
     }

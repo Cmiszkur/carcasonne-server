@@ -5,13 +5,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { CallbackError, Model } from 'mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
 import { Tile, TileDocument } from '../schemas/tile.schema';
-import { BoardMove, MoveState, RoomError, SocketAnswer, TilesSet } from '@roomModels';
+import { BoardMove, MoveState, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
+import { TilesService } from './tiles.service';
 
 @Injectable()
 export class GameService extends BasicService {
   constructor(
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
     @InjectModel(Tile.name) private tileModel: Model<TileDocument>,
+    private tilesService: TilesService,
   ) {
     super();
   }
@@ -20,8 +22,7 @@ export class GameService extends BasicService {
     const startingTilesSet: TilesSet | null = await this.getStartigTilesSet();
     const startingTile: Tile | null = startingTilesSet?.drawnTile || null;
     const searchedRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomId });
-    let allTiles: Tile[] = startingTilesSet?.allTiles || [];
-    let drawnTile: Tile | null = null;
+    const allTiles: Tile[] = startingTilesSet?.allTiles || [];
 
     if (!searchedRoom) {
       return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
@@ -29,26 +30,40 @@ export class GameService extends BasicService {
     if (!startingTile || !!allTiles.length) {
       return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null, 'Try starting game again in few seconds.');
     }
-    //Drawing random tile and returning the remaining tiles.
-    await this.drawTile(null, allTiles).then((tilesSet: TilesSet) => {
-      drawnTile = tilesSet.drawnTile;
-      allTiles = tilesSet.allTiles;
-    });
     //Updating fields.
-    searchedRoom.lastChosenTile = drawnTile ? [{ tile: drawnTile, player: username }] : [];
+    await this.drawTileAndUpdateTiles(searchedRoom, username, allTiles);
     searchedRoom.board.push(this.getExtendedStartingTile(startingTile));
-    searchedRoom.tilesLeft = allTiles;
-    searchedRoom.boardMoves.push(this.getStartingBoardMove(), this.getBoardMove(null, username));
+    searchedRoom.boardMoves.push(this.getStartingBoardMove());
     searchedRoom.gameStarted = true;
-    //Saves modified room and returns answer.
-    return searchedRoom.save().then(
-      (savedRoom: Room) => {
-        return this.createAnswer(null, { room: savedRoom, tile: null });
-      },
-      (err: Error) => {
-        return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null, err.message);
-      },
+    //Saving modified room and returns answer.
+    return this.saveRoom(searchedRoom);
+  }
+
+  public async placeTile(username: string, roomID: string, extendedTile: ExtendedTile): Promise<SocketAnswer> {
+    const searchedRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomID });
+    if (!searchedRoom) {
+      return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
+    }
+    const tiles: ExtendedTile[] = searchedRoom.board;
+    const allTiles: Tile[] = searchedRoom.tilesLeft;
+    const nextPlayer: string = this.chooseNextPlayer(searchedRoom.players, username);
+    const isPlacedTileOk: boolean = await this.tilesService.checkTile(
+      roomID,
+      extendedTile.coordinates,
+      extendedTile.tile.tileValues,
+      extendedTile.rotation,
+      extendedTile.tileValuesAfterRotation,
+      tiles,
     );
+    if (!isPlacedTileOk) {
+      return this.createAnswer(RoomError.PLACEMENT_NOT_CORRECT, null);
+    }
+    //Updating fields.
+    await this.drawTileAndUpdateTiles(searchedRoom, nextPlayer, allTiles);
+    searchedRoom.board.push(extendedTile);
+    searchedRoom.boardMoves.push(this.getBoardMove(extendedTile.coordinates, username));
+    //Saving modified room and returns answer.
+    return this.saveRoom(searchedRoom);
   }
 
   /**
@@ -64,17 +79,12 @@ export class GameService extends BasicService {
       tilesLeft = tilesSet.allTiles;
       selectedTile = tilesSet.drawnTile;
     });
-    //TODO: Zastanowić się nad sensem istenienia pola boardmove.
-    const boardMove: BoardMove = this.getBoardMove(null, player);
     if (!selectedTile || !!tilesLeft.length) {
       //FIXME: Lepszy opis błędu.
       return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null);
     }
     return await this.roomModel
-      .updateOne(
-        { roomId: roomId },
-        { tilesLeft: tilesLeft, lastChosenTile: [{ tile: selectedTile, player: player }], $push: { boardMoves: boardMove } },
-      )
+      .updateOne({ roomId: roomId }, { tilesLeft: tilesLeft, lastChosenTile: [{ tile: selectedTile, player: player }] })
       .exec()
       .then(
         () => {
@@ -84,6 +94,41 @@ export class GameService extends BasicService {
           return this.createAnswer(RoomError.DATABASE_ERROR, null, err.message);
         },
       );
+  }
+
+  private async saveRoom(room: RoomDocument): Promise<SocketAnswer> {
+    return await room.save().then(
+      (savedRoom: Room) => {
+        return this.createAnswer(null, { room: savedRoom, tile: null });
+      },
+      (err: Error) => {
+        return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null, err.message);
+      },
+    );
+  }
+
+  //TODO: Zastanowić się nad lepszą nazwą.
+  /**
+   * Draws tile from left tiles and updates field ``lastChosenTile`` and ``tilesLeft``
+   * @param room
+   * @param username
+   * @param tiles
+   */
+  private async drawTileAndUpdateTiles(room: RoomDocument, username: string, tiles: Tile[]): Promise<void> {
+    let allTiles: Tile[] = tiles;
+    let drawnTile: Tile | null = null;
+
+    await this.drawTile(null, allTiles).then((tilesSet: TilesSet) => {
+      drawnTile = tilesSet.drawnTile;
+      allTiles = tilesSet.allTiles;
+    });
+    room.lastChosenTile = drawnTile ? [{ tile: drawnTile, player: username }] : [];
+    room.tilesLeft = allTiles;
+  }
+
+  private chooseNextPlayer(players: Player[], currentPlayer: string): string {
+    const indexOfCurrentPlayer: number | undefined = players.findIndex((player) => player.username === currentPlayer);
+    return players[(indexOfCurrentPlayer + 1) % players.length].username;
   }
 
   private async drawTile(roomId: string | null, providedTilesLeft: Tile[] | null): Promise<TilesSet> {
@@ -133,14 +178,13 @@ export class GameService extends BasicService {
   }
 
   private getStartingBoardMove(): BoardMove {
-    return this.getBoardMove({ x: 0, y: 0 }, null, MoveState.PENDING);
+    return this.getBoardMove({ x: 0, y: 0 }, null);
   }
 
-  private getBoardMove(coordinates: Coordinates | null, player: string | null, moveState?: MoveState): BoardMove {
+  private getBoardMove(coordinates: Coordinates | null, player: string | null): BoardMove {
     return {
       coordinates: coordinates,
       player: player,
-      moveState: moveState || MoveState.PENDING,
     };
   }
 }
