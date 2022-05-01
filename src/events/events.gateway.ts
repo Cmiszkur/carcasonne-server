@@ -11,6 +11,7 @@ import {
   ExtendedSocket,
   GetNewTilePayload,
   JoinRoomPayload,
+  LeaveRoomPayload,
   PlacedTilePayload,
   StartGamePayload,
 } from '@socketModels';
@@ -36,14 +37,12 @@ export class EventsGateway implements OnGatewayConnection {
     const roomId: string = payload.roomID;
     const joinedRoomAnswer: SocketAnswer = await this.roomService.joinRoom(roomId, client.username, payload.color);
 
-    if (joinedRoomAnswer.error === null) {
+    if (joinedRoomAnswer.error === null || joinedRoomAnswer.error === RoomError.PLAYER_ALREADY_IN_THE_ROOM) {
       void client.join(roomId);
       client.gameRoomId = roomId;
       this.server.to(roomId).emit('new_player_joined', joinedRoomAnswer?.answer?.room?.players);
-    } else {
-      joinedRoomAnswer.error === RoomError.PLAYER_ALREADY_IN_THE_ROOM && client.join(roomId);
-      client.emit('joined_room', joinedRoomAnswer);
     }
+    client.emit('joined_room', joinedRoomAnswer);
   }
 
   @SubscribeMessage('check_tile')
@@ -75,14 +74,17 @@ export class EventsGateway implements OnGatewayConnection {
   }
 
   @SubscribeMessage('leave_room')
-  async handleRoomLeave(client: ExtendedSocket, payload: GetNewTilePayload): Promise<void> {
+  async handleRoomLeave(client: ExtendedSocket, payload: LeaveRoomPayload): Promise<void> {
     const leftRoom: SocketAnswer = await this.roomService.leaveRoom(payload.roomID, client.username);
+    console.log(leftRoom);
     if (leftRoom.error === null) {
       void client.leave(payload.roomID);
       client.gameRoomId = undefined;
-      this.server.to(payload.roomID).emit('player_left', client.username);
+      console.log('player_left', leftRoom?.answer?.room?.players);
+      this.server.to(payload.roomID).emit('player_left', leftRoom?.answer?.room?.players);
     }
-    //TODO: Zastanowić się nad zmianą zwracanej odpowiedzi na krótszą
+    //TODO: Zastanowić się nad zmianą zwracanej odpowiedzi na krótszą albo generalnie nad
+    //sensem zwracania odpowiedzi przy opuszczaniu pokoju.
     client.emit('room_left', leftRoom);
   }
 
@@ -103,17 +105,25 @@ export class EventsGateway implements OnGatewayConnection {
     }
   }
 
+  @SubscribeMessage('test_message')
+  handleTestMessage(client: ExtendedSocket, payload: string): void {
+    console.log('Test message received', payload);
+    client.emit('test_message_response', payload);
+  }
+
   handleConnection(client: ExtendedSocket): void {
-    const username = client.request.user.username;
-    client.username = username;
-    console.log(client.username, ' connected');
+    if (!client.request.isAuthenticated()) {
+      client.disconnect();
+    } else {
+      const username = client.request.user.username;
+      client.username = username;
+      console.log(client.username, ' connected');
+    }
   }
 
   handleDisconnect(client: ExtendedSocket): void {
     if (client.gameRoomId) {
-      //TODO: Zastanowić się nad zmianą zwracanej odpowiedzi na Player[]
-      this.server.to(client.gameRoomId).emit('player_left', client.username);
-      void this.roomService.leaveRoom(client.gameRoomId, client.username);
+      void this.handleRoomLeave(client, { roomID: client.gameRoomId });
     }
     console.log(client.username, ' disconnected');
   }

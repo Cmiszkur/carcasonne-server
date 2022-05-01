@@ -5,7 +5,7 @@ import { Room, RoomDocument } from '../schemas/room.schema';
 import { FilterQuery, Model, QueryOptions, UpdateQuery } from 'mongoose';
 import { Tile } from '../schemas/tile.schema';
 import { UsersService } from 'src/users/users.service';
-import { Player, SocketAnswer, RoomError } from '@roomModels';
+import { Player, SocketAnswer, RoomError, ShortenedRoom } from '@roomModels';
 
 export default class RoomService extends BasicService {
   constructor(
@@ -56,21 +56,43 @@ export default class RoomService extends BasicService {
       } else {
         roomToJoin.players.push(player);
         roomToJoin.numberOfPlayers = roomToJoin.numberOfPlayers + 1;
-        await roomToJoin.save();
+        return this.saveRoom(roomToJoin);
       }
     } else {
       return this.createAnswer(RoomError.GAME_HAS_ALREADY_STARTED, null);
     }
-    return this.answer;
   }
 
+  /**
+   * TODO: Dodać obsługę usuwania pokoju jeśli host opuści pokoj
+   * @param roomId
+   * @param username
+   * @returns
+   */
   public async leaveRoom(roomId: string, username: string): Promise<SocketAnswer> {
-    await this.findRoomAndUpdate(
+    console.log(username, ' leaving room...');
+    // const leftRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomId });
+    // if (leftRoom === null) {
+    //   return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
+    // }
+    return await this.findRoomAndUpdate(
       { roomId: roomId },
       { $pull: { players: { username: username } }, $inc: { numberOfPlayers: -1 } },
       { new: true },
     );
-    return this.answer;
+  }
+
+  /**
+   * Returns available rooms limiting response to 10 documents.
+   * Omits fields responsible for tiles and board.
+   * @returns
+   */
+  public async getAllRooms(): Promise<ShortenedRoom[]> {
+    return await this.roomModel
+      .find({ gameStarted: false })
+      .limit(10)
+      .select({ players: 1, numberOfPlayers: 1, roomHost: 1, roomId: 1 })
+      .exec();
   }
 
   /**
@@ -83,16 +105,16 @@ export default class RoomService extends BasicService {
     filter: FilterQuery<RoomDocument>,
     update: UpdateQuery<RoomDocument>,
     options?: QueryOptions,
-  ): Promise<void> {
+  ): Promise<SocketAnswer> {
     return this.roomModel
       .findOneAndUpdate(filter, update, options)
       .exec()
       .then(
         (room: RoomDocument | null) => {
-          this.setAnswer = this.createAnswer(room ? null : RoomError.ROOM_NOT_FOUND, { room, tile: null });
+          return this.createAnswer(room ? null : RoomError.ROOM_NOT_FOUND, { room, tile: null });
         },
         () => {
-          this.setAnswer = this.createAnswer(RoomError.DATABASE_ERROR, null);
+          return this.createAnswer(RoomError.DATABASE_ERROR, null);
         },
       );
   }

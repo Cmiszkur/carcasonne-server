@@ -2,7 +2,7 @@ import { RegisterResponse } from './../interfaces';
 import { User, UserDocument } from './schemas/user.schema';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, UpdateWriteOpResult } from 'mongoose';
+import { LeanDocument, Model, Query, UpdateWriteOpResult } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class UsersService {
   saltRounds = 10;
   response: RegisterResponse = { message: '', error: '' };
 
-  async create(createUser: User) {
+  async create(createUser: User): Promise<User> {
     const plainPassword = createUser.password;
     const username = createUser.username;
     await this.userModel.findOne({ username: username }).then((user) => {
@@ -33,9 +33,9 @@ export class UsersService {
           throw new HttpException('Invalid credentials', HttpStatus.BAD_REQUEST);
         }
         bcrypt.genSalt(this.saltRounds, (err, salt) => {
-          if (err) throw new Error(err);
+          if (err) throw new Error(err.message);
           bcrypt.hash(plainPassword, salt, (err, hash: string) => {
-            if (err) throw new Error(err);
+            if (err) throw new Error(err.message);
             createUser.password = hash;
             const createdUser = new this.userModel(createUser);
             createdUser.save((err) => {
@@ -50,37 +50,12 @@ export class UsersService {
     return new User(createUser);
   }
 
-  // async setCurrentRefreshToken(refreshToken: string, username: string) {
-  //   const currentHashedRefreshToken = await bcrypt.hash(
-  //     refreshToken,
-  //     this.saltRounds,
-  //   );
-  //   await this.userModel
-  //     .findOneAndUpdate(
-  //       { username: username },
-  //       { currentHashedRefreshToken: currentHashedRefreshToken },
-  //     )
-  //     .lean();
-  // }
-
-  // async getUserIfRefreshTokenMatches(refreshToken: string, username: string) {
-  //   const user = await this.findOne(username);
-  //   const isRefreshTokenMatching = await bcrypt.compare(
-  //     refreshToken,
-  //     user.currentHashedRefreshToken,
-  //   );
-
-  //   if (isRefreshTokenMatching) {
-  //     return user;
-  //   }
-  // }
-
   async findOne(username: string): Promise<User> {
     return this.userModel.findOne({ username: username }).select('-__v').lean();
   }
 
-  findById(id: string, cb: any) {
-    return this.userModel.findById(id, cb).select('-_id -__v -password -currentHashedRefreshToken');
+  async findById(id: string, cb: (Error, User) => void): Promise<LeanDocument<UserDocument> | null> {
+    return this.userModel.findById(id, cb).lean();
   }
 
   async checkIfRoomCreatedByUser(username: string): Promise<string | null> {

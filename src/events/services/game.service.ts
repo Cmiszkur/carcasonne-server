@@ -96,16 +96,16 @@ export class GameService extends BasicService {
       );
   }
 
-  private async saveRoom(room: RoomDocument): Promise<SocketAnswer> {
-    return await room.save().then(
-      (savedRoom: Room) => {
-        return this.createAnswer(null, { room: savedRoom, tile: null });
-      },
-      (err: Error) => {
-        return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null, err.message);
-      },
-    );
-  }
+  // private async saveRoom(room: RoomDocument): Promise<SocketAnswer> {
+  //   return await room.save().then(
+  //     (savedRoom: Room) => {
+  //       return this.createAnswer(null, { room: savedRoom, tile: null });
+  //     },
+  //     (err: Error) => {
+  //       return this.createAnswer(RoomError.DATABASE_ERROR, null, err.message);
+  //     },
+  //   );
+  // }
 
   //TODO: Zastanowić się nad lepszą nazwą.
   /**

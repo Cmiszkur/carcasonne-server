@@ -3,13 +3,14 @@ import { UsersService } from './../users/users.service';
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { LoginResponse } from 'src/interfaces';
+import { User } from 'src/users/schemas/user.schema';
 
 @Injectable()
 export class AuthService {
   constructor(private usersService: UsersService) {}
 
   async validateUser(username: string, pass: string): Promise<LoginResponse> {
-    const user = await this.usersService.findOne(username);
+    const user: User = await this.usersService.findOne(username);
     if (!user) {
       console.log('nie ma takiego użytkownika');
       return {
@@ -17,9 +18,10 @@ export class AuthService {
         user: null,
       };
     }
-    const isMatch = await bcrypt.compare(pass, user.password);
+    const isMatch: boolean = await bcrypt.compare(pass, user.password);
     if (isMatch) {
-      const { password, currentHashedRefreshToken, ...rest } = user;
+      const { password, ...rest } = user;
+      console.log(rest);
       return { error: null, user: rest };
     } else {
       console.log('hasła się nie zgadzają');

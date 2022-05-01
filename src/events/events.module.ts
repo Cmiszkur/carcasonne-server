@@ -19,5 +19,6 @@ import { TilesService } from './services/tiles.service';
       { name: User.name, schema: UserSchema },
     ]),
   ],
+  exports: [RoomService],
 })
 export class EventsModule {}

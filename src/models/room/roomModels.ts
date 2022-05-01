@@ -49,3 +49,5 @@ export interface TileAndPlayer {
   tile: Tile;
   player: string;
 }
+
+export type ShortenedRoom = Pick<Room, 'players' | 'numberOfPlayers' | 'roomHost' | 'roomId' | 'gameStarted' | 'gameEnded'>;

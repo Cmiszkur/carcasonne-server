@@ -1,22 +1,13 @@
-import { Controller, Get, Post, Request, UseFilters, UseGuards } from '@nestjs/common';
-import { AppService } from './app.service';
-import { LocalAuthGuard } from './auth/guards/local-auth.guard';
+import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { AuthenticatedGuard } from './auth/guards/authenticated.guard';
+import { AppResponse, ExtendedRequest } from 'src/models/common.models';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
-
-  @UseGuards(LocalAuthGuard)
-  @Post('auth/login')
-  async login(@Request() req) {
-    return { statusCode: 200, message: req.user };
-  }
-
   @UseGuards(AuthenticatedGuard)
   @Get('/restricted')
-  check() {
+  check(@Request() req: ExtendedRequest): AppResponse {
     console.log('restrcited path is authorized');
-    return { statusCode: 200, message: 'Authorized' };
+    return { message: req.user };
   }
 }

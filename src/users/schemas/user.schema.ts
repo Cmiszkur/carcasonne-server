@@ -19,10 +19,6 @@ export class User {
   @Prop()
   password: string;
 
-  @Exclude()
-  @Prop()
-  currentHashedRefreshToken?: string;
-
   @Prop()
   lastCreatedRoom?: string;
 

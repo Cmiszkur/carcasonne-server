@@ -10,6 +10,7 @@ export interface ExtendedSocket extends Socket {
 
 export interface ExtendedIncomingMessage extends IncomingMessage {
   user: RequestUser;
+  isAuthenticated(): boolean;
 }
 
 export interface RequestUser {
@@ -27,6 +28,8 @@ export interface StartGamePayload extends BasePayload {
 }
 
 export type GetNewTilePayload = BasePayload;
+
+export type LeaveRoomPayload = BasePayload;
 
 export interface CheckTilePayload extends BasePayload {
   coordinates: Coordinates;

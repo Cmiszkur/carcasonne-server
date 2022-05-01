@@ -1,9 +1,10 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { ExtendedRequest } from 'src/models/common.models';
 
 @Injectable()
 export class AuthenticatedGuard implements CanActivate {
-  async canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest();
+  canActivate(context: ExecutionContext): boolean {
+    const request: ExtendedRequest = context.switchToHttp().getRequest<ExtendedRequest>();
     return request.isAuthenticated();
   }
 }
