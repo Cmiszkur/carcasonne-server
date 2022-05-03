@@ -20,11 +20,15 @@ export interface RequestUser {
 }
 
 export interface JoinRoomPayload extends BasePayload {
-  color: string;
+  /**
+   * Color is passed when player is joining to the room
+   * that has not already started.
+   */
+  color?: string;
 }
 
 export interface StartGamePayload extends BasePayload {
-  username: string;
+  username?: string;
 }
 
 export type GetNewTilePayload = BasePayload;

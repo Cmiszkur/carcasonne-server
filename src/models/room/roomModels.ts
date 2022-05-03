@@ -32,6 +32,12 @@ export interface Player {
   username: string;
   color: string;
   followers: number;
+  state: PlayerState;
+}
+
+export enum PlayerState {
+  CONNECTED = 'connnected',
+  DISCONNECTED = 'disconnnected',
 }
 
 export enum RoomError {
@@ -43,6 +49,7 @@ export enum RoomError {
   NO_STARTING_TILE_FOUND = 'No starting tile found',
   GAME_HAS_ALREADY_STARTED = 'Game has already started',
   PLACEMENT_NOT_CORRECT = 'Tile placement is not correct',
+  MEEPLE_COLOR_NOT_SPECIFIED = 'Meeple color not specified',
 }
 
 export interface TileAndPlayer {

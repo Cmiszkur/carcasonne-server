@@ -2,10 +2,10 @@ import { Coordinates, ExtendedTile } from '@tileModels';
 import { BasicService } from './basic.service';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { CallbackError, Model } from 'mongoose';
+import { Model } from 'mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
 import { Tile, TileDocument } from '../schemas/tile.schema';
-import { BoardMove, MoveState, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
+import { BoardMove, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
 import { TilesService } from './tiles.service';
 
 @Injectable()
@@ -27,7 +27,7 @@ export class GameService extends BasicService {
     if (!searchedRoom) {
       return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
     }
-    if (!startingTile || !!allTiles.length) {
+    if (!startingTile || allTiles.length === 0) {
       return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null, 'Try starting game again in few seconds.');
     }
     //Updating fields.
@@ -84,7 +84,7 @@ export class GameService extends BasicService {
       return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null);
     }
     return await this.roomModel
-      .updateOne({ roomId: roomId }, { tilesLeft: tilesLeft, lastChosenTile: [{ tile: selectedTile, player: player }] })
+      .updateOne({ roomId: roomId }, { tilesLeft: tilesLeft, lastChosenTile: { tile: selectedTile, player: player } })
       .exec()
       .then(
         () => {
@@ -95,17 +95,6 @@ export class GameService extends BasicService {
         },
       );
   }
-
-  // private async saveRoom(room: RoomDocument): Promise<SocketAnswer> {
-  //   return await room.save().then(
-  //     (savedRoom: Room) => {
-  //       return this.createAnswer(null, { room: savedRoom, tile: null });
-  //     },
-  //     (err: Error) => {
-  //       return this.createAnswer(RoomError.DATABASE_ERROR, null, err.message);
-  //     },
-  //   );
-  // }
 
   //TODO: Zastanowić się nad lepszą nazwą.
   /**
@@ -122,7 +111,7 @@ export class GameService extends BasicService {
       drawnTile = tilesSet.drawnTile;
       allTiles = tilesSet.allTiles;
     });
-    room.lastChosenTile = drawnTile ? [{ tile: drawnTile, player: username }] : [];
+    room.lastChosenTile = drawnTile ? { tile: drawnTile, player: username } : null;
     room.tilesLeft = allTiles;
   }
 
@@ -148,20 +137,15 @@ export class GameService extends BasicService {
   private async getStartigTilesSet(): Promise<TilesSet | null> {
     let indexOfElementToDelete = -1;
     let startingTile: Tile | null = null;
-    const allTiles: TileDocument[] = await this.tileModel
-      .find({}, (err: CallbackError, tiles: TileDocument[]) => {
-        if (err) {
-          this.createAnswer(RoomError.DATABASE_ERROR, null, err.message);
-        }
-        indexOfElementToDelete = tiles.findIndex((tile: TileDocument) => {
-          if (tile.tileName === 'road_top_bottom_town_right') {
-            startingTile = tile;
-            return true;
-          }
-          return false;
-        });
-      })
-      .lean();
+    const allTiles: TileDocument[] = await this.tileModel.find({}).lean();
+
+    indexOfElementToDelete = allTiles.findIndex((tile: TileDocument) => {
+      if (tile.tileName === 'road_top_bottom_town_right') {
+        startingTile = tile;
+        return true;
+      }
+      return false;
+    });
 
     allTiles.splice(indexOfElementToDelete, 1);
     return startingTile ? { allTiles, drawnTile: startingTile } : null;

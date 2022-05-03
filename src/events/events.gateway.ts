@@ -88,7 +88,8 @@ export class EventsGateway implements OnGatewayConnection {
 
   @SubscribeMessage('start_game')
   async handleStartGame(client: ExtendedSocket, payload: StartGamePayload): Promise<void> {
-    const startedRoomAnswer: SocketAnswer = await this.gameService.startGame(payload.roomID, payload.username);
+    const username: string = client.username;
+    const startedRoomAnswer: SocketAnswer = await this.gameService.startGame(payload.roomID, username);
     this.server.to(payload.roomID).emit('game_started', startedRoomAnswer);
   }
 

@@ -17,6 +17,7 @@ export class Room {
           enum: ['green', 'blue', 'yellow', 'red'],
         },
         followers: { type: Number, min: 0, max: 6 },
+        state: String,
       },
     ],
   })
@@ -36,8 +37,10 @@ export class Room {
   })
   boardMoves: BoardMove[];
 
-  @Prop()
-  lastChosenTile: TileAndPlayer[];
+  @Prop({
+    type: {} || null,
+  })
+  lastChosenTile: TileAndPlayer | null;
 
   @Prop()
   tilesLeft: Tile[];
