@@ -3,11 +3,11 @@ import { UseGuards } from '@nestjs/common';
 import { OnGatewayConnection, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { WsAuthenticatedGuard } from 'src/auth/guards/ws.authenticated.guard';
-import crypto = require('crypto');
 import RoomService from './services/room.service';
 import { TilesService } from './services/tiles.service';
 import {
   CheckTilePayload,
+  CreateRoomPayload,
   ExtendedSocket,
   GetNewTilePayload,
   JoinRoomPayload,
@@ -15,8 +15,8 @@ import {
   PlacedTilePayload,
   StartGamePayload,
 } from '@socketModels';
-import { SocketAnswer } from '@roomModels';
-import { RoomError } from '../models/room/roomModels';
+import { RoomError, SocketAnswer } from '@roomModels';
+import * as crypto from 'crypto';
 
 //TODO: Spróbować dodać nowy gateway w celu uporządkowania kodu.
 @WebSocketGateway(80, {
@@ -27,10 +27,10 @@ import { RoomError } from '../models/room/roomModels';
 })
 @UseGuards(WsAuthenticatedGuard)
 export class EventsGateway implements OnGatewayConnection {
-  constructor(private roomService: RoomService, private tilesService: TilesService, private gameService: GameService) {}
-
   @WebSocketServer()
   server: Server;
+
+  constructor(private roomService: RoomService, private tilesService: TilesService, private gameService: GameService) {}
 
   @SubscribeMessage('join_room')
   async handleMessage(client: ExtendedSocket, payload: JoinRoomPayload): Promise<void> {
@@ -61,10 +61,10 @@ export class EventsGateway implements OnGatewayConnection {
   }
 
   @SubscribeMessage('create_room')
-  async handleRoomCreate(client: ExtendedSocket, payload: unknown): Promise<void> {
+  async handleRoomCreate(client: ExtendedSocket, payload: CreateRoomPayload): Promise<void> {
     const roomID = crypto.randomBytes(20).toString('hex');
     const host = client.username;
-    const color = 'green';
+    const color = payload.color;
     const createdRoom: SocketAnswer = await this.roomService.roomCreate(host, roomID, color);
     if (createdRoom.error === null) {
       void client.join(roomID);
@@ -76,11 +76,9 @@ export class EventsGateway implements OnGatewayConnection {
   @SubscribeMessage('leave_room')
   async handleRoomLeave(client: ExtendedSocket, payload: LeaveRoomPayload): Promise<void> {
     const leftRoom: SocketAnswer = await this.roomService.leaveRoom(payload.roomID, client.username);
-    console.log(leftRoom);
     if (leftRoom.error === null) {
       void client.leave(payload.roomID);
       client.gameRoomId = undefined;
-      console.log('player_left', leftRoom?.answer?.room?.players);
       this.server.to(payload.roomID).emit('player_left', leftRoom?.answer?.room?.players);
     }
     //TODO: Zastanowić się nad zmianą zwracanej odpowiedzi na krótszą albo generalnie nad

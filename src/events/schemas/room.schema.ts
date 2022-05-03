@@ -57,6 +57,9 @@ export class Room {
   @Prop()
   roomHost: string;
 
+  @Prop({ type: Date || null })
+  hostLeftDate: Date | null;
+
   constructor(partial: Partial<Room>) {
     Object.assign(this, partial);
   }

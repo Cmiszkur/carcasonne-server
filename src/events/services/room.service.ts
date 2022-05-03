@@ -1,11 +1,11 @@
 import { BasicService } from './basic.service';
-import { TileDocument } from './../schemas/tile.schema';
+import { TileDocument } from '../schemas/tile.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
 import { FilterQuery, Model, QueryOptions, UpdateQuery } from 'mongoose';
 import { Tile } from '../schemas/tile.schema';
 import { UsersService } from 'src/users/users.service';
-import { Player, SocketAnswer, RoomError, ShortenedRoom } from '@roomModels';
+import { Player, RoomError, ShortenedRoom, SocketAnswer } from '@roomModels';
 
 export default class RoomService extends BasicService {
   constructor(
@@ -56,6 +56,7 @@ export default class RoomService extends BasicService {
       } else {
         roomToJoin.players.push(player);
         roomToJoin.numberOfPlayers = roomToJoin.numberOfPlayers + 1;
+        roomToJoin.hostLeftDate = roomToJoin.roomHost === username ? null : roomToJoin.hostLeftDate;
         return this.saveRoom(roomToJoin);
       }
     } else {
@@ -64,22 +65,21 @@ export default class RoomService extends BasicService {
   }
 
   /**
-   * TODO: Dodać obsługę usuwania pokoju jeśli host opuści pokoj
    * @param roomId
    * @param username
    * @returns
    */
   public async leaveRoom(roomId: string, username: string): Promise<SocketAnswer> {
     console.log(username, ' leaving room...');
-    // const leftRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomId });
-    // if (leftRoom === null) {
-    //   return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
-    // }
-    return await this.findRoomAndUpdate(
-      { roomId: roomId },
-      { $pull: { players: { username: username } }, $inc: { numberOfPlayers: -1 } },
-      { new: true },
-    );
+    const leftRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomId });
+    if (leftRoom === null) {
+      return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
+    }
+    leftRoom.numberOfPlayers -= 1;
+    leftRoom.players = leftRoom.players.filter((player) => player.username !== username);
+    leftRoom.hostLeftDate = leftRoom.roomHost === username ? new Date() : null;
+    console.log('players after leaving', leftRoom.players);
+    return this.saveRoom(leftRoom);
   }
 
   /**
@@ -99,6 +99,7 @@ export default class RoomService extends BasicService {
    * On success creates answer with room object and on error creates message with error and error message.
    * @param filter
    * @param update
+   * @param options
    * @returns
    */
   private async findRoomAndUpdate(
@@ -159,6 +160,7 @@ export default class RoomService extends BasicService {
       numberOfPlayers: 1,
       roomHost: host,
       lastChosenTile: [],
+      hostLeftDate: null,
     };
   }
 }
