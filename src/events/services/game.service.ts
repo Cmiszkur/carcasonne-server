@@ -1,10 +1,10 @@
-import { Coordinates, ExtendedTile } from '@tileModels';
+import { Coordinates, ExtendedTile, Tile } from '@tileModels';
 import { BasicService } from './basic.service';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
-import { Tile, TileDocument } from '../schemas/tile.schema';
+import { Tiles, TileDocument } from '../schemas/tiles.schema';
 import { BoardMove, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
 import { TilesService } from './tiles.service';
 
@@ -12,17 +12,17 @@ import { TilesService } from './tiles.service';
 export class GameService extends BasicService {
   constructor(
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
-    @InjectModel(Tile.name) private tileModel: Model<TileDocument>,
+    @InjectModel(Tiles.name) private tileModel: Model<TileDocument>,
     private tilesService: TilesService,
   ) {
     super();
   }
 
   public async startGame(roomId: string, username: string): Promise<SocketAnswer> {
-    const startingTilesSet: TilesSet | null = await this.getStartigTilesSet();
+    const startingTilesSet: TilesSet | null = await this.getStartingTilesSet();
     const startingTile: Tile | null = startingTilesSet?.drawnTile || null;
     const searchedRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomId });
-    const allTiles: Tile[] = startingTilesSet?.allTiles || [];
+    const allTiles: Tiles[] = startingTilesSet?.allTiles || [];
 
     if (!searchedRoom) {
       return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
@@ -45,7 +45,7 @@ export class GameService extends BasicService {
       return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
     }
     const tiles: ExtendedTile[] = searchedRoom.board;
-    const allTiles: Tile[] = searchedRoom.tilesLeft;
+    const allTiles: Tiles[] = searchedRoom.tilesLeft;
     const nextPlayer: string = this.chooseNextPlayer(searchedRoom.players, username);
     const isPlacedTileOk: boolean = await this.tilesService.checkTile(
       roomID,
@@ -73,7 +73,7 @@ export class GameService extends BasicService {
    * @returns
    */
   public async getNewTile(roomId: string, player: string): Promise<SocketAnswer> {
-    let tilesLeft: Tile[] = [];
+    let tilesLeft: Tiles[] = [];
     let selectedTile: Tile | null = null;
     await this.drawTile(roomId, null).then((tilesSet: TilesSet) => {
       tilesLeft = tilesSet.allTiles;
@@ -103,8 +103,8 @@ export class GameService extends BasicService {
    * @param username
    * @param tiles
    */
-  private async drawTileAndUpdateTiles(room: RoomDocument, username: string, tiles: Tile[]): Promise<void> {
-    let allTiles: Tile[] = tiles;
+  private async drawTileAndUpdateTiles(room: RoomDocument, username: string, tiles: Tiles[]): Promise<void> {
+    let allTiles: Tiles[] = tiles;
     let drawnTile: Tile | null = null;
 
     await this.drawTile(null, allTiles).then((tilesSet: TilesSet) => {
@@ -120,34 +120,42 @@ export class GameService extends BasicService {
     return players[(indexOfCurrentPlayer + 1) % players.length].username;
   }
 
-  private async drawTile(roomId: string | null, providedTilesLeft: Tile[] | null): Promise<TilesSet> {
-    const tilesLeft: Tile[] =
+  private async drawTile(roomId: string | null, providedTilesLeft: Tiles[] | null): Promise<TilesSet> {
+    let tilesLeft: Tiles[] =
       providedTilesLeft ||
       (roomId ? (await this.roomModel.findOne({ roomId: roomId }).select('tilesLeft').exec())?.tilesLeft || [] : []);
-    const randomNumber: number = Math.floor(Math.random() * tilesLeft.length);
-    const drawnTile: Tile | null = tilesLeft[randomNumber] || null;
-    tilesLeft.splice(randomNumber, 1);
+    const pickedTileId: string = this.pickRandomTileId(tilesLeft);
+    const drawnTile = tilesLeft.find((tiles) => tiles.id === pickedTileId)?.tile || null;
+    tilesLeft = this.deletePickedTile(tilesLeft, pickedTileId);
     return { allTiles: tilesLeft, drawnTile };
+  }
+
+  private pickRandomTileId(tilesLeft: Tiles[]): string {
+    const tilesDispersed: string[] = tilesLeft.flatMap((tiles) => {
+      return Array(tiles.numberOfTiles).fill(tiles.id, 0, tiles.numberOfTiles - 1) as string[];
+    });
+    const randomNumber: number = Math.floor(Math.random() * tilesLeft.length);
+    return tilesDispersed[randomNumber];
+  }
+
+  private deletePickedTile(tilesLeft: Tiles[], tilesId: string): Tiles[] {
+    const indexOfElementToDelete: number = tilesLeft.findIndex((tiles) => tiles.id === tilesId);
+    tilesLeft[indexOfElementToDelete].numberOfTiles -= 1;
+    if (tilesLeft[indexOfElementToDelete].numberOfTiles === 0) delete tilesLeft[indexOfElementToDelete];
+    return tilesLeft;
   }
 
   /**
    * Downloads and returns all tiles from database. Sets the starting tile from downloaded tiles.
    * @returns
    */
-  private async getStartigTilesSet(): Promise<TilesSet | null> {
-    let indexOfElementToDelete = -1;
-    let startingTile: Tile | null = null;
+  private async getStartingTilesSet(): Promise<TilesSet | null> {
     const allTiles: TileDocument[] = await this.tileModel.find({}).lean();
+    console.log(allTiles);
+    const indexOfElementToDelete: number = allTiles.findIndex((tiles: TileDocument) => tiles.tile.tileName === 'toRroTB');
+    const startingTile: Tile | null = allTiles[indexOfElementToDelete].tile;
 
-    indexOfElementToDelete = allTiles.findIndex((tile: TileDocument) => {
-      if (tile.tileName === 'road_top_bottom_town_right') {
-        startingTile = tile;
-        return true;
-      }
-      return false;
-    });
-
-    allTiles.splice(indexOfElementToDelete, 1);
+    allTiles[indexOfElementToDelete].numberOfTiles -= 1;
     return startingTile ? { allTiles, drawnTile: startingTile } : null;
   }
 

@@ -3,13 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Coordinates, ExtendedTile, Position, TileValues, TileValuesFlat } from 'src/models/tiles/tilesModels';
 import { Room, RoomDocument } from '../schemas/room.schema';
-import { Tile, TileDocument } from '../schemas/tile.schema';
+import { Tiles, TileDocument } from '../schemas/tiles.schema';
 
 @Injectable()
 export class TilesService {
   constructor(
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
-    @InjectModel(Tile.name) private tileModel: Model<TileDocument>,
+    @InjectModel(Tiles.name) private tileModel: Model<TileDocument>,
   ) {}
 
   public async checkTile(

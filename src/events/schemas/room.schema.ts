@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { BoardMove, Player, TileAndPlayer } from '@roomModels';
 import { ExtendedTile } from '@tileModels';
 import { Document } from 'mongoose';
-import { Tile } from './tile.schema';
+import { Tiles } from './tiles.schema';
 
 export type RoomDocument = Room & Document;
 
@@ -43,7 +43,7 @@ export class Room {
   lastChosenTile: TileAndPlayer | null;
 
   @Prop()
-  tilesLeft: Tile[];
+  tilesLeft: Tiles[];
 
   @Prop()
   gameStarted: boolean;

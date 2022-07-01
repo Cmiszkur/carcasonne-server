@@ -1,6 +1,6 @@
-import { Coordinates } from 'src/models/tiles/tilesModels';
+import { Coordinates, Tile } from 'src/models/tiles/tilesModels';
 import { Room } from 'src/events/schemas/room.schema';
-import { Tile } from 'src/events/schemas/tile.schema';
+import { Tiles } from '../../events/schemas/tiles.schema';
 
 export interface SocketAnswer {
   error: RoomError | null;
@@ -14,13 +14,8 @@ export interface Answer {
 }
 
 export interface TilesSet {
-  allTiles: Tile[];
+  allTiles: Tiles[];
   drawnTile: Tile | null;
-}
-
-export enum MoveState {
-  PENDING = 'pending',
-  ENDED = 'ended',
 }
 
 export interface BoardMove {

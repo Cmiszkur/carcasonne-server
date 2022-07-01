@@ -1,5 +1,5 @@
 import { BasicService } from './basic.service';
-import { Tile, TileDocument } from '../schemas/tile.schema';
+import { Tiles, TileDocument } from '../schemas/tiles.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
 import { FilterQuery, Model, QueryOptions, UpdateQuery } from 'mongoose';
@@ -9,7 +9,7 @@ import { Player, PlayerState, RoomError, ShortenedRoom, SocketAnswer } from '@ro
 export default class RoomService extends BasicService {
   constructor(
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
-    @InjectModel(Tile.name) private tileModel: Model<TileDocument>,
+    @InjectModel(Tiles.name) private tileModel: Model<TileDocument>,
     private usersService: UsersService,
   ) {
     super();
@@ -60,6 +60,7 @@ export default class RoomService extends BasicService {
     if (roomToJoin.gameStarted) {
       if (isPlayerAlreadyInRoom) {
         roomToJoin.players = this.changePlayerState(roomToJoin.players, username, PlayerState.CONNECTED);
+        roomToJoin.hostLeftDate = roomToJoin.roomHost === username ? null : roomToJoin.hostLeftDate;
         return this.saveRoom(roomToJoin);
       } else {
         return this.createAnswer(RoomError.GAME_HAS_ALREADY_STARTED, null);
@@ -74,7 +75,6 @@ export default class RoomService extends BasicService {
         const player: Player = { username, color, followers: 6, state: PlayerState.CONNECTED };
         roomToJoin.players.push(player);
         roomToJoin.numberOfPlayers = roomToJoin.numberOfPlayers + 1;
-        roomToJoin.hostLeftDate = roomToJoin.roomHost === username ? null : roomToJoin.hostLeftDate;
         return this.saveRoom(roomToJoin);
       }
     }

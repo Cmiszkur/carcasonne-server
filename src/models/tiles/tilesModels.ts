@@ -1,5 +1,3 @@
-import { Tile } from 'src/events/schemas/tile.schema';
-
 export interface Coordinates {
   x: number;
   y: number;
@@ -42,4 +40,11 @@ export enum TileEnvironments {
   ROADS = 'roads',
   CITIES = 'cities',
   CHURCH = 'church',
+}
+
+export interface Tile {
+  tileName: string;
+  tileValues: TileValues;
+  extraPoints: boolean;
+  hasChurch: boolean;
 }

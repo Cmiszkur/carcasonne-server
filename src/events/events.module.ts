@@ -4,7 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Module } from '@nestjs/common';
 import { EventsGateway } from './events.gateway';
 import RoomService from './services/room.service';
-import { Tile, TileSchema } from './schemas/tile.schema';
+import { Tiles, TilesSchema } from './schemas/tiles.schema';
 import { Room, RoomSchema } from './schemas/room.schema';
 import { UsersService } from 'src/users/users.service';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
@@ -15,7 +15,7 @@ import { TilesService } from './services/tiles.service';
   imports: [
     MongooseModule.forFeature([
       { name: Room.name, schema: RoomSchema },
-      { name: Tile.name, schema: TileSchema },
+      { name: Tiles.name, schema: TilesSchema },
       { name: User.name, schema: UserSchema },
     ]),
   ],
