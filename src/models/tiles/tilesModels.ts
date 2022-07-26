@@ -33,7 +33,7 @@ export interface FollowerDetails {
   username: string;
   playerColor: string;
   placement: TileEnvironments;
-  position: Position;
+  position: Position[];
 }
 
 export enum TileEnvironments {

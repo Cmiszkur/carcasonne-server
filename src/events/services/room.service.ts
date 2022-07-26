@@ -98,7 +98,6 @@ export default class RoomService extends BasicService {
       leftRoom.numberOfPlayers -= 1;
       leftRoom.players = leftRoom.players.filter((player) => player.username !== username);
     }
-    console.log(leftRoom.roomHost, username);
     leftRoom.hostLeftDate = leftRoom.roomHost === username ? new Date() : leftRoom.hostLeftDate;
     return this.saveRoom(leftRoom);
   }

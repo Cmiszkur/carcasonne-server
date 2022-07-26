@@ -40,26 +40,28 @@ export class GameService extends BasicService {
   }
 
   public async placeTile(username: string, roomID: string, extendedTile: ExtendedTile): Promise<SocketAnswer> {
+    extendedTile.tileValuesAfterRotation = this.tilesService.tilesValuesAfterRotation(
+      extendedTile.tile.tileValues,
+      extendedTile.rotation,
+    );
+
     const searchedRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomID });
     if (!searchedRoom) {
       return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
     }
-    const tiles: ExtendedTile[] = searchedRoom.board;
-    const allTiles: Tiles[] = searchedRoom.tilesLeft;
-    const nextPlayer: string = this.chooseNextPlayer(searchedRoom.players, username);
+
     const isPlacedTileOk: boolean = await this.tilesService.checkTile(
       roomID,
       extendedTile.coordinates,
-      extendedTile.tile.tileValues,
-      extendedTile.rotation,
       extendedTile.tileValuesAfterRotation,
-      tiles,
+      searchedRoom.board,
     );
     if (!isPlacedTileOk) {
       return this.createAnswer(RoomError.PLACEMENT_NOT_CORRECT, null);
     }
-    //Updating fields.
-    await this.drawTileAndUpdateTiles(searchedRoom, nextPlayer, allTiles);
+
+    const nextPlayer: string = this.chooseNextPlayer(searchedRoom.players, username);
+    await this.drawTileAndUpdateTiles(searchedRoom, nextPlayer, searchedRoom.tilesLeft);
     searchedRoom.board.push(extendedTile);
     searchedRoom.boardMoves.push(this.getBoardMove(extendedTile.coordinates, username));
     //Saving modified room and returns answer.
@@ -151,7 +153,6 @@ export class GameService extends BasicService {
    */
   private async getStartingTilesSet(): Promise<TilesSet | null> {
     const allTiles: TileDocument[] = await this.tileModel.find({}).lean();
-    console.log(allTiles);
     const indexOfElementToDelete: number = allTiles.findIndex((tiles: TileDocument) => tiles.tile.tileName === 'toRroTB');
     const startingTile: Tile | null = allTiles[indexOfElementToDelete].tile;
 

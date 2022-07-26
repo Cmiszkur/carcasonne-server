@@ -3,21 +3,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Coordinates, ExtendedTile, Position, TileValues, TileValuesFlat } from 'src/models/tiles/tilesModels';
 import { Room, RoomDocument } from '../schemas/room.schema';
-import { Tiles, TileDocument } from '../schemas/tiles.schema';
 
 @Injectable()
 export class TilesService {
-  constructor(
-    @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
-    @InjectModel(Tiles.name) private tileModel: Model<TileDocument>,
-  ) {}
+  constructor(@InjectModel(Room.name) private roomModel: Model<RoomDocument>) {}
 
   public async checkTile(
     roomID: string,
     coordinates: Coordinates,
-    tileValues: TileValues,
-    rotation: number,
-    tilesValuesAfterRotation?: TileValues,
+    tilesValuesAfterRotation: TileValues,
     uncheckedTiles?: ExtendedTile[],
   ): Promise<boolean> {
     const _uncheckedTiles: ExtendedTile[] = uncheckedTiles || (await this.roomModel.findOne({ roomId: roomID }).lean())?.board || [];
@@ -29,8 +23,7 @@ export class TilesService {
     if (tilesWithCoordinatesToCheck === null) {
       return false;
     }
-    const _tilesValuesAfterRotation: TileValues = tilesValuesAfterRotation || this.tilesValuesAfterRotation(tileValues, rotation);
-    return this.compareTileValues(_tilesValuesAfterRotation, tilesWithCoordinatesToCheck);
+    return this.compareTileValues(tilesValuesAfterRotation, tilesWithCoordinatesToCheck);
   }
 
   /**
@@ -39,7 +32,8 @@ export class TilesService {
    * @param rotation
    * @returns
    */
-  private tilesValuesAfterRotation(tileValues: TileValues, rotation: number): TileValues {
+  public tilesValuesAfterRotation(tileValues: TileValues, rotation: number): TileValues {
+    const copiedTileValues: TileValues = JSON.parse(JSON.stringify(tileValues)) as TileValues;
     const positions: Position[] = [Position.TOP, Position.RIGHT, Position.BOTTOM, Position.LEFT];
     const rotationValueToIndexSkip: Map<number, number> = new Map<number, number>([
       [0, 0],
@@ -49,7 +43,7 @@ export class TilesService {
     ]);
     const indexesToSkip: number | undefined = rotationValueToIndexSkip.get(rotation);
 
-    for (const [key, positionsInTileValues] of Object.entries(tileValues)) {
+    for (const [key, positionsInTileValues] of Object.entries(copiedTileValues)) {
       (positionsInTileValues as [Position[]]).forEach((positionSet: Position[]) => {
         positionSet.forEach((position: Position, positionIndex: number) => {
           const indexInPositionsTable: number = positions.indexOf(position);
@@ -59,7 +53,7 @@ export class TilesService {
         });
       });
     }
-    return tileValues;
+    return copiedTileValues;
   }
 
   /**
