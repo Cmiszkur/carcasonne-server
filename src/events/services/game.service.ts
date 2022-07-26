@@ -64,6 +64,7 @@ export class GameService extends BasicService {
     await this.drawTileAndUpdateTiles(searchedRoom, nextPlayer, searchedRoom.tilesLeft);
     searchedRoom.board.push(extendedTile);
     searchedRoom.boardMoves.push(this.getBoardMove(extendedTile.coordinates, username));
+    if (this.checkIfPawnWasPlaced(extendedTile)) this.removeFallowerFromPlayer(searchedRoom, username);
     //Saving modified room and returns answer.
     return this.saveRoom(searchedRoom);
   }
@@ -179,5 +180,24 @@ export class GameService extends BasicService {
       coordinates: coordinates,
       player: player,
     };
+  }
+
+  /**
+   * Checks if pawn was placed on newly send tile.
+   * @param tile
+   * @returns
+   */
+  private checkIfPawnWasPlaced(tile: ExtendedTile): boolean {
+    return !!tile.fallowerDetails;
+  }
+
+  /**
+   * Removes fallower from player.
+   * @param room
+   * @param username
+   */
+  private removeFallowerFromPlayer(room: Room, username: string): void {
+    const playerIndex: number = room.players.findIndex((p) => p.username === username);
+    room.players[playerIndex].followers -= 1;
   }
 }
