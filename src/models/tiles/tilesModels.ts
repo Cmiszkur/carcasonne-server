@@ -21,6 +21,7 @@ export interface TileValuesFlat {
 }
 
 export interface ExtendedTile {
+  id: string;
   tile: Tile;
   coordinates: Coordinates;
   isFollowerPlaced: boolean;

@@ -7,6 +7,8 @@ import { Room, RoomDocument } from '../schemas/room.schema';
 import { Tiles, TileDocument } from '../schemas/tiles.schema';
 import { BoardMove, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
 import { TilesService } from './tiles.service';
+import * as crypto from 'crypto';
+import { PointCountingService } from './point-counting.service';
 
 @Injectable()
 export class GameService extends BasicService {
@@ -14,6 +16,7 @@ export class GameService extends BasicService {
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
     @InjectModel(Tiles.name) private tileModel: Model<TileDocument>,
     private tilesService: TilesService,
+    private pointCountingService: PointCountingService,
   ) {
     super();
   }
@@ -62,6 +65,8 @@ export class GameService extends BasicService {
 
     const nextPlayer: string = this.chooseNextPlayer(searchedRoom.players, username);
     await this.drawTileAndUpdateTiles(searchedRoom, nextPlayer, searchedRoom.tilesLeft);
+    extendedTile.id = crypto.randomUUID();
+    this.pointCountingService.checkNewTile(searchedRoom, extendedTile);
     searchedRoom.board.push(extendedTile);
     searchedRoom.boardMoves.push(this.getBoardMove(extendedTile.coordinates, username));
     if (this.checkIfPawnWasPlaced(extendedTile)) this.removeFallowerFromPlayer(searchedRoom, username);
@@ -163,6 +168,7 @@ export class GameService extends BasicService {
 
   private getExtendedStartingTile(startingTile: Tile): ExtendedTile {
     return {
+      id: crypto.randomUUID(),
       tile: startingTile,
       coordinates: { x: 0, y: 0 },
       isFollowerPlaced: false,

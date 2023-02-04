@@ -33,6 +33,7 @@ export class TilesService {
    * @returns
    */
   public tilesValuesAfterRotation(tileValues: TileValues, rotation: number): TileValues {
+    console.log('tileValues', tileValues);
     const copiedTileValues: TileValues = JSON.parse(JSON.stringify(tileValues)) as TileValues;
     const positions: Position[] = [Position.TOP, Position.RIGHT, Position.BOTTOM, Position.LEFT];
     const rotationValueToIndexSkip: Map<number, number> = new Map<number, number>([

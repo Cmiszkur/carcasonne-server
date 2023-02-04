@@ -9,9 +9,10 @@ import { Room, RoomSchema } from './schemas/room.schema';
 import { UsersService } from 'src/users/users.service';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { TilesService } from './services/tiles.service';
+import { PointCountingService } from './services/point-counting.service';
 
 @Module({
-  providers: [EventsGateway, RoomService, UsersService, TilesService, GameService, BasicService],
+  providers: [EventsGateway, RoomService, UsersService, TilesService, GameService, BasicService, PointCountingService],
   imports: [
     MongooseModule.forFeature([
       { name: Room.name, schema: RoomSchema },
