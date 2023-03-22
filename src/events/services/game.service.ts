@@ -43,22 +43,12 @@ export class GameService extends BasicService {
   }
 
   public async placeTile(username: string, roomID: string, extendedTile: ExtendedTile): Promise<SocketAnswer> {
-    extendedTile.tileValuesAfterRotation = this.tilesService.tilesValuesAfterRotation(
-      extendedTile.tile.tileValues,
-      extendedTile.rotation,
-    );
-
     const searchedRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomID });
     if (!searchedRoom) {
       return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
     }
 
-    const isPlacedTileOk: boolean = await this.tilesService.checkTile(
-      roomID,
-      extendedTile.coordinates,
-      extendedTile.tileValuesAfterRotation,
-      searchedRoom.board,
-    );
+    const isPlacedTileOk: boolean = await this.tilesService.checkTile(roomID, extendedTile, searchedRoom.board);
     if (!isPlacedTileOk) {
       return this.createAnswer(RoomError.PLACEMENT_NOT_CORRECT, null);
     }

@@ -27,7 +27,7 @@ export interface ExtendedTile {
   isFollowerPlaced: boolean;
   rotation: number;
   fallowerDetails?: FollowerDetails;
-  tileValuesAfterRotation: TileValues;
+  tileValuesAfterRotation: TileValues | null;
 }
 
 export interface FollowerDetails {
@@ -45,7 +45,7 @@ export enum TileEnvironments {
 
 export interface Tile {
   tileName: string;
-  tileValues: TileValues;
+  tileValues: TileValues | null;
   extraPoints: boolean;
   hasChurch: boolean;
 }
