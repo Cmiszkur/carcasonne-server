@@ -4,7 +4,7 @@ import { OnGatewayConnection, SubscribeMessage, WebSocketGateway, WebSocketServe
 import { Server } from 'socket.io';
 import { WsAuthenticatedGuard } from 'src/auth/guards/ws.authenticated.guard';
 import RoomService from './services/room.service';
-import { TilesService } from './services/tiles.service';
+import { CheckTilesService } from './services/check-tiles.service';
 import {
   CheckTilePayload,
   CreateRoomPayload,
@@ -30,7 +30,7 @@ export class EventsGateway implements OnGatewayConnection {
   @WebSocketServer()
   server: Server;
 
-  constructor(private roomService: RoomService, private tilesService: TilesService, private gameService: GameService) {}
+  constructor(private roomService: RoomService, private checkTilesService: CheckTilesService, private gameService: GameService) {}
 
   @SubscribeMessage('join_room')
   async handleMessage(client: ExtendedSocket, payload: JoinRoomPayload): Promise<void> {

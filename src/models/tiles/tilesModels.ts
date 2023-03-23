@@ -49,3 +49,18 @@ export interface Tile {
   extraPoints: boolean;
   hasChurch: boolean;
 }
+
+/**
+ * Map key is path id.
+ */
+export type PathData = Map<string, CountedTiles>;
+
+/**
+ * Map key is tile id.
+ */
+export type CountedTiles = Map<string, CountedTile>;
+
+export interface CountedTile {
+  isPathCompleted: boolean;
+  checkedPositions: Set<Position>;
+}

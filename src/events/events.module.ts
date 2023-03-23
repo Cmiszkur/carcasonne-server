@@ -8,11 +8,21 @@ import { Tiles, TilesSchema } from './schemas/tiles.schema';
 import { Room, RoomSchema } from './schemas/room.schema';
 import { UsersService } from 'src/users/users.service';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
-import { TilesService } from './services/tiles.service';
+import { CheckTilesService } from './services/check-tiles.service';
 import { PointCountingService } from './services/point-counting.service';
+import { TilesService } from './services/tiles.service';
 
 @Module({
-  providers: [EventsGateway, RoomService, UsersService, TilesService, GameService, BasicService, PointCountingService],
+  providers: [
+    EventsGateway,
+    RoomService,
+    UsersService,
+    CheckTilesService,
+    GameService,
+    BasicService,
+    PointCountingService,
+    TilesService,
+  ],
   imports: [
     MongooseModule.forFeature([
       { name: Room.name, schema: RoomSchema },

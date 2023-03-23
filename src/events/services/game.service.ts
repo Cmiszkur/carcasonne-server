@@ -6,7 +6,7 @@ import { Model } from 'mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
 import { Tiles, TileDocument } from '../schemas/tiles.schema';
 import { BoardMove, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
-import { TilesService } from './tiles.service';
+import { CheckTilesService } from './check-tiles.service';
 import * as crypto from 'crypto';
 import { PointCountingService } from './point-counting.service';
 
@@ -15,7 +15,7 @@ export class GameService extends BasicService {
   constructor(
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
     @InjectModel(Tiles.name) private tileModel: Model<TileDocument>,
-    private tilesService: TilesService,
+    private checkTilesService: CheckTilesService,
     private pointCountingService: PointCountingService,
   ) {
     super();
@@ -48,7 +48,7 @@ export class GameService extends BasicService {
       return this.createAnswer(RoomError.ROOM_NOT_FOUND, null);
     }
 
-    const isPlacedTileOk: boolean = await this.tilesService.checkTile(roomID, extendedTile, searchedRoom.board);
+    const isPlacedTileOk: boolean = await this.checkTilesService.checkTile(roomID, extendedTile, searchedRoom.board);
     if (!isPlacedTileOk) {
       return this.createAnswer(RoomError.PLACEMENT_NOT_CORRECT, null);
     }
@@ -56,12 +56,20 @@ export class GameService extends BasicService {
     const nextPlayer: string = this.chooseNextPlayer(searchedRoom.players, username);
     await this.drawTileAndUpdateTiles(searchedRoom, nextPlayer, searchedRoom.tilesLeft);
     extendedTile.id = crypto.randomUUID();
-    this.pointCountingService.checkNewTile(searchedRoom, extendedTile);
+    this.setTilesAfterRotationValue(extendedTile);
     searchedRoom.board.push(extendedTile);
     searchedRoom.boardMoves.push(this.getBoardMove(extendedTile.coordinates, username));
     if (this.checkIfPawnWasPlaced(extendedTile)) this.removeFallowerFromPlayer(searchedRoom, username);
+    this.pointCountingService.checkNewTile(searchedRoom, extendedTile);
     //Saving modified room and returns answer.
     return this.saveRoom(searchedRoom);
+  }
+
+  private setTilesAfterRotationValue(extendedTile: ExtendedTile): void {
+    extendedTile.tileValuesAfterRotation = this.checkTilesService.tilesValuesAfterRotation(
+      extendedTile.tile.tileValues,
+      extendedTile.rotation,
+    );
   }
 
   /**
