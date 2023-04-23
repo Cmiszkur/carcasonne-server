@@ -53,7 +53,14 @@ export interface Tile {
 /**
  * Map key is path id.
  */
-export type PathData = Map<string, CountedTiles>;
+export type PathDataMap = Map<string, PathData>;
+
+export interface PathData {
+  countedTiles: CountedTiles;
+  pathOwners: string[];
+  points?: number;
+  completed: boolean;
+}
 
 /**
  * Map key is tile id.
@@ -63,4 +70,5 @@ export type CountedTiles = Map<string, CountedTile>;
 export interface CountedTile {
   isPathCompleted: boolean;
   checkedPositions: Set<Position>;
+  coordinates: Coordinates;
 }

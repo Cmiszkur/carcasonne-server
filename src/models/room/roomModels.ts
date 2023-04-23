@@ -1,4 +1,4 @@
-import { Coordinates, Tile } from 'src/models/tiles/tilesModels';
+import { Coordinates, PathDataMap, Tile } from 'src/models/tiles/tilesModels';
 import { Room } from 'src/events/schemas/room.schema';
 import { Tiles } from '../../events/schemas/tiles.schema';
 
@@ -50,6 +50,11 @@ export enum RoomError {
 export interface TileAndPlayer {
   tile: Tile;
   player: string;
+}
+
+export interface Paths {
+  cities: PathDataMap;
+  roads: PathDataMap;
 }
 
 export type ShortenedRoom = Pick<Room, 'players' | 'numberOfPlayers' | 'roomHost' | 'roomId' | 'gameStarted' | 'gameEnded'>;

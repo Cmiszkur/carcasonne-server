@@ -30,9 +30,7 @@ export class CheckTilesService {
    * @returns
    */
   public tilesValuesAfterRotation(tileValues: TileValues | null, rotation: number): TileValues | null {
-    console.log('tileValues', tileValues, tileValues === null);
     if (tileValues === null) {
-      console.log('kościół');
       return null;
     }
     const copiedTileValues: TileValues = JSON.parse(JSON.stringify(tileValues)) as TileValues;
@@ -71,7 +69,7 @@ export class CheckTilesService {
     coordinates: Coordinates,
   ): Map<Position, ExtendedTile> | null {
     const coordinatesAlreadyTaken: boolean =
-      uncheckedTiles.findIndex((tile) => tile.coordinates.x === coordinates.x && tile.coordinates.y === coordinates.y) >= 0;
+      uncheckedTiles.findIndex((tile) => this.tilesService.checkCoordinates(tile.coordinates, coordinates)) >= 0;
     if (coordinatesAlreadyTaken) {
       return null;
     }
@@ -91,7 +89,7 @@ export class CheckTilesService {
 
     coordinatesToCheck.forEach((coordinates: Coordinates, coordinatesIndex: number) => {
       uncheckedTiles.forEach((tileToCheck: ExtendedTile) => {
-        if (tileToCheck.coordinates.x === coordinates.x && tileToCheck.coordinates.y === coordinates.y) {
+        if (this.tilesService.checkCoordinates(tileToCheck.coordinates, coordinates)) {
           const checkedTilePosition: Position | undefined = indexToPositionValue.get(coordinatesIndex + 1);
           checkedTilePosition && tilesWithCoordinatesToCheck.set(checkedTilePosition, tileToCheck);
           return;
@@ -111,7 +109,6 @@ export class CheckTilesService {
       if (oppositePosition) {
         const checkedTileEnvironment = this.getEnvironmentFromPostition(currentlyCheckedTileValues, oppositePosition);
         const placedTileEnvironment = this.getEnvironmentFromPostition(tileValues, position);
-        console.log('placedTileEnvironment', placedTileEnvironment, 'checkedTileEnvironment', checkedTileEnvironment);
         isOK = placedTileEnvironment === checkedTileEnvironment;
       }
     }

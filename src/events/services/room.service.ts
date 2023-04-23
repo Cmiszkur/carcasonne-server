@@ -199,6 +199,7 @@ export default class RoomService extends BasicService {
       roomHost: host,
       lastChosenTile: null,
       hostLeftDate: null,
+      paths: { cities: new Map(), roads: new Map() },
     };
   }
 }

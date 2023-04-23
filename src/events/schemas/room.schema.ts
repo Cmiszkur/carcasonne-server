@@ -1,7 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { BoardMove, Player, TileAndPlayer } from '@roomModels';
+import { BoardMove, Paths, Player, TileAndPlayer } from '@roomModels';
 import { ExtendedTile } from '@tileModels';
 import { Document } from 'mongoose';
+import { deserializeObj, serializeObj } from '../functions/copyObject';
 import { Tiles } from './tiles.schema';
 
 export type RoomDocument = Room & Document;
@@ -63,12 +64,21 @@ export class Room {
   @Prop({ type: Date || null })
   hostLeftDate: Date | null;
 
+  @Prop({
+    type: Object,
+    set: serializeObj,
+    get: deserializeObj,
+  })
+  paths: Paths;
+
   constructor(partial: Partial<Room>) {
     Object.assign(this, partial);
   }
 }
 
 export const RoomSchema = SchemaFactory.createForClass(Room);
+
+RoomSchema.set('toObject', { getters: true });
 
 RoomSchema.path('players').validate((players: []) => {
   if (players.length > 3) {

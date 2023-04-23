@@ -9,6 +9,7 @@ import { BoardMove, Player, RoomError, SocketAnswer, TilesSet } from '@roomModel
 import { CheckTilesService } from './check-tiles.service';
 import * as crypto from 'crypto';
 import { PointCountingService } from './point-counting.service';
+import { copy } from '../functions/copyObject';
 
 @Injectable()
 export class GameService extends BasicService {
@@ -33,15 +34,25 @@ export class GameService extends BasicService {
     if (!startingTile || allTiles.length === 0) {
       return this.createAnswer(RoomError.NO_STARTING_TILE_FOUND, null, 'Try starting game again in few seconds.');
     }
+
     //Updating fields.
     await this.drawTileAndUpdateTiles(searchedRoom, username, allTiles);
-    searchedRoom.board.push(this.getExtendedStartingTile(startingTile));
+    const extendedStartingTile: ExtendedTile = this.getExtendedStartingTile(startingTile);
+    searchedRoom.board.push(extendedStartingTile);
     searchedRoom.boardMoves.push(this.getStartingBoardMove());
     searchedRoom.gameStarted = true;
+
     //Saving modified room and returns answer.
     return this.saveRoom(searchedRoom);
   }
 
+  /**
+   * Places an ExtendedTile on the game board for the specified user and room, performs several checks before placing the tile.
+   * @param username - The username of the user attempting to place the tile.
+   * @param roomID - The ID of the room where the tile will be placed.
+   * @param extendedTile - The tile to be placed on the board.
+   * @returns The result of the attempted tile placement.
+   */
   public async placeTile(username: string, roomID: string, extendedTile: ExtendedTile): Promise<SocketAnswer> {
     const searchedRoom: RoomDocument | null = await this.roomModel.findOne({ roomId: roomID });
     if (!searchedRoom) {
@@ -53,15 +64,28 @@ export class GameService extends BasicService {
       return this.createAnswer(RoomError.PLACEMENT_NOT_CORRECT, null);
     }
 
+    // Choose the next player in turn
     const nextPlayer: string = this.chooseNextPlayer(searchedRoom.players, username);
+
+    // Draw a tile for the next player and update the tilesLeft count
     await this.drawTileAndUpdateTiles(searchedRoom, nextPlayer, searchedRoom.tilesLeft);
+
+    // Generate a unique ID for the placed tile and set its values after rotation
     extendedTile.id = crypto.randomUUID();
     this.setTilesAfterRotationValue(extendedTile);
+
+    // Add the placed tile to the board and record the move in boardMoves
     searchedRoom.board.push(extendedTile);
     searchedRoom.boardMoves.push(this.getBoardMove(extendedTile.coordinates, username));
+
+    // If a pawn is placed on the tile, remove the corresponding follower from the player's inventory
     if (this.checkIfPawnWasPlaced(extendedTile)) this.removeFallowerFromPlayer(searchedRoom, username);
-    this.pointCountingService.checkNewTile(searchedRoom, extendedTile);
-    //Saving modified room and returns answer.
+
+    // Check the point scoring for the new tile and update the paths accordingly
+    const copiedSearchedRoom = copy(searchedRoom.toObject());
+    searchedRoom.paths = this.pointCountingService.checkNewTile(copiedSearchedRoom, extendedTile);
+
+    // Save the modified room and return an answer indicating success
     return this.saveRoom(searchedRoom);
   }
 

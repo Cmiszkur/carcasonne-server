@@ -3,7 +3,9 @@ import {
   CountedTile,
   CountedTiles,
   ExtendedTile,
+  FollowerDetails,
   PathData,
+  PathDataMap,
   Position,
   TileValues,
 } from './../../models/tiles/tilesModels';
@@ -11,117 +13,148 @@ import { Injectable } from '@nestjs/common';
 import { Room } from '../schemas/room.schema';
 import { TilesService } from './tiles.service';
 import * as crypto from 'crypto';
-
-interface NearestTiles {
-  top: ExtendedTile | null;
-  right: ExtendedTile | null;
-  bottom: ExtendedTile | null;
-  left: ExtendedTile | null;
-}
+import { copy } from '../functions/copyObject';
+import { Paths } from '@roomModels';
 
 @Injectable()
 export class PointCountingService {
-  private tileIdsWithRoadsChecked: PathData;
-  private tileIdsWithCitiesChecked: PathData;
+  constructor(private tilesService: TilesService) {}
 
-  constructor(private tilesService: TilesService) {
-    this.tileIdsWithRoadsChecked = new Map();
-    this.tileIdsWithCitiesChecked = new Map();
-  }
-
-  public checkNewTile(room: Room, placedTile: ExtendedTile): void {
-    const isFallowerPlaced = !!placedTile.fallowerDetails;
-    const cities: [Position[]] | undefined = placedTile.tileValuesAfterRotation?.cities;
-    const roads: [Position[]] | undefined = placedTile.tileValuesAfterRotation?.roads;
-    const coordinates: Coordinates = placedTile.coordinates;
-    const placedTileId = placedTile.id;
-
-    this.clearCheckedTilesIds();
+  public checkNewTile(room: Room, placedTile: ExtendedTile): Paths {
+    const copiedPlacedTile: ExtendedTile = copy(placedTile);
+    const paths = room.paths;
+    const uncompletedPaths = this.filterCompletedPaths(paths);
+    const uncompletedRoadsPathDataMap: PathDataMap = uncompletedPaths.roads;
+    const uncompletedCitiesPathDataMap: PathDataMap = uncompletedPaths.cities;
+    const placedFallower: FollowerDetails | undefined = copiedPlacedTile.fallowerDetails;
+    const cities: [Position[]] | undefined = copiedPlacedTile.tileValuesAfterRotation?.cities;
+    const roads: [Position[]] | undefined = copiedPlacedTile.tileValuesAfterRotation?.roads;
+    const coordinates: Coordinates = copiedPlacedTile.coordinates;
+    const placedTileId = copiedPlacedTile.id;
+    const newOrUpdatedPathIds: Set<string> = new Set();
 
     if (cities) {
-      this.checkNextTilesCities(room.board, cities, this.tileIdsWithCitiesChecked, coordinates, 'cities', placedTileId);
+      this.checkNextTile(room.board, cities, uncompletedCitiesPathDataMap, coordinates, 'cities', placedTileId, newOrUpdatedPathIds);
     }
     if (roads) {
-      this.checkNextTilesCities(room.board, roads, this.tileIdsWithRoadsChecked, coordinates, 'roads', placedTileId);
+      this.checkNextTile(room.board, roads, uncompletedRoadsPathDataMap, coordinates, 'roads', placedTileId, newOrUpdatedPathIds);
     }
 
-    const entries2 = this.tileIdsWithCitiesChecked.entries();
-    let console2 = entries2.next();
-    while (!console2.done) {
-      console.log('pathId: ', console2.value[0]);
-      console.log('======================');
-      const entries22 = console2.value[1].entries();
-      let console22 = entries22.next();
-      while (!console22.done) {
-        console.log(console22.value[0], console22.value[1]);
-        console22 = entries22.next();
-      }
-      console2 = entries2.next();
-    }
+    this.checkPathCompletion(uncompletedRoadsPathDataMap, room.board, newOrUpdatedPathIds);
+    this.checkPathCompletion(uncompletedCitiesPathDataMap, room.board, newOrUpdatedPathIds);
 
-    const entries3 = this.tileIdsWithRoadsChecked.entries();
-    let console3 = entries3.next();
-    while (!console3.done) {
-      console.log('pathId: ', console3.value[0]);
-      console.log('======================');
-      const entries33 = console3.value[1].entries();
-      let console33 = entries33.next();
-      while (!console33.done) {
-        console.log(console33.value[0], console33.value[1]);
-        console33 = entries33.next();
-      }
-      console3 = entries3.next();
-    }
+    const mergedPaths = {
+      cities: new Map([...paths.cities, ...uncompletedCitiesPathDataMap]),
+      roads: new Map([...paths.roads, ...uncompletedRoadsPathDataMap]),
+    };
+
+    this.logPaths(mergedPaths.roads, mergedPaths.cities);
+    return mergedPaths;
   }
 
-  private checkNextTilesCities(
+  private checkNextTile(
     board: ExtendedTile[],
     citiesOrRoads: [Position[]],
-    pathData: PathData,
+    pathData: PathDataMap,
     coordinates: Coordinates,
     tileValuesKey: keyof TileValues,
     tileId: string,
-    previousTilePosition?: Position,
+    newOrUpdatedPathIds: Set<string>,
     pathIdFromPreviousTile?: string,
   ): void {
     citiesOrRoads.forEach((positionSet) => {
-      if (previousTilePosition && positionSet.every((position) => position !== previousTilePosition)) return;
-      const pathId = pathIdFromPreviousTile || this.initializePath(pathData);
-      const isCompleted: boolean = this.isTileCompleted(positionSet, board, coordinates, pathId, pathData);
-      positionSet.forEach((position) => {
+      if (positionSet.length >= 2) {
+        this.checkAndMergeNearestPaths(positionSet, coordinates, pathData);
+      } else {
+        const position: Position = positionSet[0];
         const nextTile: ExtendedTile | null = this.extractNearestTile(board, coordinates, position);
-        const isTileAlreadyChecked: boolean = this.isTileAlreadyChecked(pathId, pathData, position, nextTile?.id);
+        console.log(position, pathIdFromPreviousTile, this.getPathId(pathData, nextTile));
+        const pathId = pathIdFromPreviousTile || this.getPathId(pathData, nextTile) || this.initializePath(pathData);
+        const isNextTileAlreadyChecked: boolean = this.isTileAlreadyChecked(pathId, pathData, position, nextTile?.id);
         const nextTileCitiesOrRoads: [Position[]] | undefined = nextTile?.tileValuesAfterRotation?.[tileValuesKey];
-        this.updatePathData(pathData, tileId, pathId, isCompleted, position);
-        if (nextTile && nextTileCitiesOrRoads && !isTileAlreadyChecked) {
-          this.checkNextTilesCities(
+
+        newOrUpdatedPathIds.add(pathId);
+        this.updatePathData(pathData, tileId, pathId, position, coordinates);
+        if (nextTile && nextTileCitiesOrRoads && !isNextTileAlreadyChecked) {
+          this.checkNextTile(
             board,
             nextTileCitiesOrRoads,
             pathData,
             nextTile.coordinates,
             tileValuesKey,
             nextTile.id,
-            this.tilesService.getOppositePositions(position),
+            newOrUpdatedPathIds,
             pathId,
           );
         }
-      });
+      }
     });
   }
 
-  public extractNearestTile(board: ExtendedTile[], coordinates: Coordinates, position: Position): ExtendedTile | null {
-    switch (position) {
-      case Position.TOP:
-        return this.findTileWithGivenCoordinates(board, { x: coordinates.x, y: coordinates.y + 1 });
-      case Position.RIGHT:
-        return this.findTileWithGivenCoordinates(board, { x: coordinates.x + 1, y: coordinates.y });
-      case Position.BOTTOM:
-        return this.findTileWithGivenCoordinates(board, { x: coordinates.x, y: coordinates.y - 1 });
-      case Position.LEFT:
-        return this.findTileWithGivenCoordinates(board, { x: coordinates.x - 1, y: coordinates.y });
-      default:
-        return null;
+  private checkAndMergeNearestPaths(positionSet: Position[], coordinates: Coordinates, pathDataMap: PathDataMap): void {
+    const pathDataMapRecordArray: [string, PathData][] = [];
+    positionSet.forEach((position) => {
+      const nearestTileCoordinates: Coordinates | null = this.tilesService.getCorrespondingCoordinates(position, coordinates);
+      if (nearestTileCoordinates) {
+        const pathDataMapRecord = this.searchForPathWithGivenCoordinates(nearestTileCoordinates, pathDataMap);
+        if (pathDataMapRecord) pathDataMapRecordArray.push(pathDataMapRecord);
+      }
+    });
+    if (pathDataMapRecordArray.length >= 2) {
+      this.mergePaths(pathDataMapRecordArray, pathDataMap);
     }
+    if (pathDataMapRecordArray.length === 1) {
+      // Tutaj można połączyć ścieżkę z postawionym kafelkiem, skoro tylko jedna ze stron ma ścieżkę obok
+    }
+  }
+
+  private mergePaths(pathDataMapRecordArray: [string, PathData][], pathDataMap: PathDataMap): void {
+    const mergedOwners: Set<string> = new Set();
+    const mergedCountedTiles: CountedTiles = new Map<string, CountedTile>();
+    let mergedPoints = 0;
+    pathDataMapRecordArray.forEach(([pathId, pathData]) => {
+      //Deleting merged paths
+      pathDataMap.delete(pathId);
+      //Merging owners
+      pathData.pathOwners.forEach((owner) => mergedOwners.add(owner));
+      //Merging tiles
+      pathData.countedTiles.forEach((countedTile, tileId) => mergedCountedTiles.set(tileId, countedTile));
+      //Merging points
+      mergedPoints += pathData.points || 0;
+    });
+    const mergedPathData: PathData = {
+      points: mergedPoints,
+      pathOwners: Array.from(mergedOwners),
+      countedTiles: mergedCountedTiles,
+      completed: false,
+    };
+    //Setting new merged path
+    pathDataMap.set(crypto.randomUUID(), mergedPathData);
+  }
+
+  private searchForPathWithGivenCoordinates(coordinates: Coordinates, pathDataMap: PathDataMap): [string, PathData] | null {
+    // let pathId: string | null = null;
+    // pathDataMap.forEach((pathData, currentPathId) => {
+    //   pathData.countedTiles.forEach((countedTile) => {
+    //     if (this.tilesService.checkCoordinates(countedTile.coordinates, coordinates)) {
+    //       pathId = currentPathId;
+    //     }
+    //   });
+    // });
+    // return pathId;
+
+    return (
+      Array.from(pathDataMap).find((array: [string, PathData]) => {
+        return Array.from(array[1].countedTiles.values()).find((countedTile) => {
+          return this.tilesService.checkCoordinates(countedTile.coordinates, coordinates);
+        });
+      }) ?? null
+    );
+  }
+
+  private extractNearestTile(board: ExtendedTile[], coordinates: Coordinates, position: Position): ExtendedTile | null {
+    const nearestTileCoordinates: Coordinates | null = this.tilesService.getCorrespondingCoordinates(position, coordinates);
+    return nearestTileCoordinates ? this.findTileWithGivenCoordinates(board, nearestTileCoordinates) : null;
   }
 
   private findTileWithGivenCoordinates(board: ExtendedTile[], coordinates: Coordinates): ExtendedTile | null {
@@ -131,33 +164,22 @@ export class PointCountingService {
     );
   }
 
-  private clearCheckedTilesIds(): void {
-    this.tileIdsWithRoadsChecked = new Map();
-    this.tileIdsWithCitiesChecked = new Map();
-  }
-
-  private isTileCompleted(
-    positionSet: Position[],
-    board: ExtendedTile[],
-    coordinates: Coordinates,
-    pathId: string,
-    pathData: PathData,
-  ): boolean {
+  private isTileCompleted(positionSet: Position[], board: ExtendedTile[], coordinates: Coordinates): boolean {
     const isCompleted: boolean[] = [];
+
     positionSet.forEach((position) => {
       const nextTile = this.extractNearestTile(board, coordinates, position);
-      const nextTileId = nextTile?.id;
-      const isTileAlreadyChecked: boolean = this.isTileAlreadyChecked(pathId, pathData, position, nextTileId);
-      isCompleted.push(isTileAlreadyChecked || !!nextTile);
+      isCompleted.push(!!nextTile);
+      console.log(position, !!nextTile);
     });
-    return isCompleted.every((x) => !!x);
+    return isCompleted.every(Boolean);
   }
 
-  private isTileAlreadyChecked(pathId: string, pathData: PathData, position: Position, tileId?: string): boolean {
+  private isTileAlreadyChecked(pathId: string, pathData: PathDataMap, position: Position, tileId?: string): boolean {
     return (
       pathData
         .get(pathId)
-        ?.get(tileId || '')
+        ?.countedTiles?.get(tileId || '')
         ?.checkedPositions.has(this.tilesService.getOppositePositions(position)) || false
     );
   }
@@ -165,18 +187,84 @@ export class PointCountingService {
   /**
    * @returns pathID
    */
-  private initializePath(pathData: PathData): string {
+  private initializePath(pathData: PathDataMap): string {
     const pathId: string = crypto.randomUUID();
-    pathData.set(pathId, new Map<string, CountedTile>());
+    pathData.set(pathId, { countedTiles: new Map<string, CountedTile>(), pathOwners: [], completed: false });
     return pathId;
   }
 
-  private updatePathData(pathData: PathData, tileId: string, pathId: string, isPathCompleted: boolean, position: Position): void {
-    const updatedTile = pathData.get(pathId)?.get(tileId);
+  private updatePathData(pathData: PathDataMap, tileId: string, pathId: string, position: Position, coordinates: Coordinates): void {
+    const updatedTile = pathData.get(pathId)?.countedTiles.get(tileId);
     if (updatedTile) {
       updatedTile.checkedPositions.add(position);
     } else {
-      pathData.get(pathId)?.set(tileId, { isPathCompleted, checkedPositions: new Set([position]) });
+      pathData.get(pathId)?.countedTiles?.set(tileId, { isPathCompleted: false, checkedPositions: new Set([position]), coordinates });
     }
+  }
+
+  private filterCompletedPaths(paths: Paths): Paths {
+    return {
+      cities: this.filterCompletedPathDataMap(paths.cities),
+      roads: this.filterCompletedPathDataMap(paths.roads),
+    };
+  }
+
+  private filterCompletedPathDataMap(pathDataMap: PathDataMap): PathDataMap {
+    return new Map(Array.from(pathDataMap).filter(([key, value]) => !value.completed));
+  }
+
+  private getPathId(pathDataMap: PathDataMap, nextTile: ExtendedTile | null): string | undefined {
+    if (nextTile) {
+      let pathId: string | undefined;
+      pathDataMap.forEach((pathData, key) => {
+        if (pathData.countedTiles.has(nextTile.id)) pathId = key;
+      });
+      return pathId;
+    }
+    return undefined;
+  }
+
+  private checkPathCompletion(pathDataMap: PathDataMap, board: ExtendedTile[], newOrUpdatedPathIds: Set<string>): void {
+    newOrUpdatedPathIds.forEach((newOrUpdatedPathId) => {
+      const checkedPath = pathDataMap.get(newOrUpdatedPathId);
+      if (checkedPath) {
+        const isCompleted: boolean[] = [];
+        const checkedPathTiles = Array.from(checkedPath.countedTiles.values());
+        checkedPathTiles.forEach((checkedPathTile) => {
+          const isTileCompleted: boolean = this.isTileCompleted(
+            Array.from(checkedPathTile.checkedPositions.values()),
+            board,
+            checkedPathTile.coordinates,
+          );
+          isCompleted.push(isTileCompleted);
+        });
+        checkedPath.completed = isCompleted.every(Boolean);
+      }
+    });
+  }
+
+  private logPaths(roadsPathDataMap: PathDataMap, citiesPathDataMap: PathDataMap): void {
+    roadsPathDataMap.forEach((pathData, pathId) => {
+      console.log('roads pathId: ', pathId);
+      console.log(' path completed: ', pathData.completed);
+      pathData.countedTiles.forEach((countedTile, tileId) => {
+        console.log('   tileId: ', tileId);
+        console.log('   tile coordinates: ', countedTile.coordinates);
+        console.log('   tile checked positions: ', countedTile.checkedPositions);
+        console.log('   =============================================');
+      });
+      console.log('==================================================');
+    });
+
+    citiesPathDataMap.forEach((pathData, pathId) => {
+      console.log('cities pathId: ', pathId);
+      console.log(' path completed: ', pathData.completed);
+      pathData.countedTiles.forEach((countedTile, tileId) => {
+        console.log('   tileId: ', tileId);
+        console.log('   tile coordinates: ', countedTile.coordinates);
+        console.log('   tile checked positions: ', countedTile.checkedPositions);
+      });
+      console.log('==================================================');
+    });
   }
 }
