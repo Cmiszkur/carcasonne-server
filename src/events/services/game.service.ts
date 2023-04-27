@@ -244,6 +244,7 @@ export class GameService extends BasicService {
         {
           pathOwners: [],
           completed: false,
+          points: positions.length * 2,
           countedTiles: new Map([
             [tile.id, { coordinates: tile.coordinates, checkedPositions: new Set(positions), isPathCompleted: false }],
           ]),

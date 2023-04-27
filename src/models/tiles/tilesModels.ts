@@ -58,7 +58,7 @@ export type PathDataMap = Map<string, PathData>;
 export interface PathData {
   countedTiles: CountedTiles;
   pathOwners: string[];
-  points?: number;
+  points: number;
   completed: boolean;
 }
 

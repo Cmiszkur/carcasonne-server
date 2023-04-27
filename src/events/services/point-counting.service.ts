@@ -42,6 +42,7 @@ export class PointCountingService {
         'cities',
         placedTileId,
         newOrUpdatedPathIds,
+        copiedPlacedTile.tile.extraPoints,
         placedFallower,
       );
     }
@@ -54,6 +55,7 @@ export class PointCountingService {
         'roads',
         placedTileId,
         newOrUpdatedPathIds,
+        copiedPlacedTile.tile.extraPoints,
         placedFallower,
       );
     }
@@ -78,12 +80,13 @@ export class PointCountingService {
     tileValuesKey: keyof TileValues,
     tileId: string,
     newOrUpdatedPathIds: Set<string>,
+    extraPoints: boolean,
     placedFallower?: FollowerDetails,
     pathIdFromPreviousTile?: string,
   ): void {
     citiesOrRoads.forEach((positionSet) => {
       if (positionSet.length >= 2) {
-        this.checkAndMergeNearestPaths(positionSet, coordinates, pathData, tileId, placedFallower);
+        return this.checkAndMergeNearestPaths(positionSet, coordinates, pathData, tileId, tileValuesKey, extraPoints, placedFallower);
       } else {
         const position: Position = positionSet[0];
         const nextTile: ExtendedTile | null = this.extractNearestTile(board, coordinates, position);
@@ -100,7 +103,7 @@ export class PointCountingService {
         const nextTileCitiesOrRoads: [Position[]] | undefined = nextTile?.tileValuesAfterRotation?.[tileValuesKey];
 
         newOrUpdatedPathIds.add(pathId);
-        this.updatePathData(pathData, tileId, pathId, coordinates, placedFallower, position);
+        this.updatePathData(pathData, tileId, pathId, coordinates, tileValuesKey, placedFallower, extraPoints, position);
         if (nextTile && nextTileCitiesOrRoads && !isNextTileAlreadyChecked) {
           this.checkNextTile(
             board,
@@ -110,6 +113,7 @@ export class PointCountingService {
             tileValuesKey,
             nextTile.id,
             newOrUpdatedPathIds,
+            nextTile.tile.extraPoints,
             undefined,
             pathId,
           );
@@ -123,6 +127,8 @@ export class PointCountingService {
     coordinates: Coordinates,
     pathDataMap: PathDataMap,
     tileId: string,
+    tileValuesKey: keyof TileValues,
+    extraPoints?: boolean,
     placedFallower?: FollowerDetails,
   ): void {
     const pathDataMapRecordArray: [string, PathData][] = [];
@@ -136,10 +142,8 @@ export class PointCountingService {
     if (pathDataMapRecordArray.length >= 2) {
       this.mergePaths(pathDataMapRecordArray, pathDataMap, placedFallower);
     }
-    if (pathDataMapRecordArray.length === 1) {
-      const pathId: string = pathDataMapRecordArray[0][0];
-      this.updatePathData(pathDataMap, tileId, pathId, coordinates, placedFallower, ...positionSet);
-    }
+    const pathId: string = pathDataMapRecordArray[0][0];
+    this.updatePathData(pathDataMap, tileId, pathId, coordinates, tileValuesKey, placedFallower, extraPoints, ...positionSet);
   }
 
   private mergePaths(pathDataMapRecordArray: [string, PathData][], pathDataMap: PathDataMap, placedFallower?: FollowerDetails): void {
@@ -212,7 +216,7 @@ export class PointCountingService {
    */
   private initializePath(pathData: PathDataMap): string {
     const pathId: string = crypto.randomUUID();
-    pathData.set(pathId, { countedTiles: new Map<string, CountedTile>(), pathOwners: [], completed: false });
+    pathData.set(pathId, { countedTiles: new Map<string, CountedTile>(), pathOwners: [], completed: false, points: 0 });
     return pathId;
   }
 
@@ -221,22 +225,47 @@ export class PointCountingService {
     tileId: string,
     pathId: string,
     coordinates: Coordinates,
+    tileValuesKey: keyof TileValues,
     placedFallower?: FollowerDetails,
+    extraPoints?: boolean,
     ...positions: Position[]
   ): void {
     const searchedPathData = pathDataMap.get(pathId);
-    const fallowerOwner = placedFallower?.username;
-    if (searchedPathData && fallowerOwner) {
-      if (searchedPathData.pathOwners.some((pathOwner) => pathOwner !== fallowerOwner)) return;
-      searchedPathData.pathOwners.push(fallowerOwner);
-    }
+    if (!searchedPathData) return;
+    this.updatePathOwners(searchedPathData, placedFallower);
+    this.setOrUpdateCountedTile(tileId, coordinates, searchedPathData, ...positions);
+    this.countPoints(searchedPathData, tileValuesKey, extraPoints, ...positions);
+  }
+
+  private countPoints(
+    searchedPathData: PathData,
+    tileValuesKey: keyof TileValues,
+    extraPoints = false,
+    ...positions: Position[]
+  ): void {
+    const basePoints = positions.length * (tileValuesKey === 'cities' ? 2 : 1);
+    searchedPathData.points += extraPoints ? basePoints * 2 : basePoints;
+  }
+
+  private setOrUpdateCountedTile(
+    tileId: string,
+    coordinates: Coordinates,
+    searchedPathData?: PathData,
+    ...positions: Position[]
+  ): void {
     const updatedTile = searchedPathData?.countedTiles.get(tileId);
     if (updatedTile) {
       positions.forEach((position) => updatedTile.checkedPositions.add(position));
     } else {
-      pathDataMap
-        .get(pathId)
-        ?.countedTiles?.set(tileId, { isPathCompleted: false, checkedPositions: new Set(positions), coordinates });
+      searchedPathData?.countedTiles?.set(tileId, { isPathCompleted: false, checkedPositions: new Set(positions), coordinates });
+    }
+  }
+
+  private updatePathOwners(searchedPathData?: PathData, placedFallower?: FollowerDetails): void {
+    const fallowerOwner = placedFallower?.username;
+    if (searchedPathData && fallowerOwner) {
+      if (searchedPathData.pathOwners.some((pathOwner) => pathOwner !== fallowerOwner)) return;
+      searchedPathData.pathOwners.push(fallowerOwner);
     }
   }
 
@@ -285,6 +314,7 @@ export class PointCountingService {
     roadsPathDataMap.forEach((pathData, pathId) => {
       console.log('roads pathId: ', pathId);
       console.log(' path completed: ', pathData.completed);
+      console.log(' path points: ', pathData.points);
       pathData.countedTiles.forEach((countedTile, tileId) => {
         console.log('   tileId: ', tileId);
         console.log('   tile coordinates: ', countedTile.coordinates);
@@ -297,6 +327,7 @@ export class PointCountingService {
     citiesPathDataMap.forEach((pathData, pathId) => {
       console.log('cities pathId: ', pathId);
       console.log(' path completed: ', pathData.completed);
+      console.log(' path points: ', pathData.points);
       pathData.countedTiles.forEach((countedTile, tileId) => {
         console.log('   tileId: ', tileId);
         console.log('   tile coordinates: ', countedTile.coordinates);
