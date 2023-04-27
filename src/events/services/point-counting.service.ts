@@ -34,10 +34,28 @@ export class PointCountingService {
     const newOrUpdatedPathIds: Set<string> = new Set();
 
     if (cities) {
-      this.checkNextTile(room.board, cities, uncompletedCitiesPathDataMap, coordinates, 'cities', placedTileId, newOrUpdatedPathIds);
+      this.checkNextTile(
+        room.board,
+        cities,
+        uncompletedCitiesPathDataMap,
+        coordinates,
+        'cities',
+        placedTileId,
+        newOrUpdatedPathIds,
+        placedFallower,
+      );
     }
     if (roads) {
-      this.checkNextTile(room.board, roads, uncompletedRoadsPathDataMap, coordinates, 'roads', placedTileId, newOrUpdatedPathIds);
+      this.checkNextTile(
+        room.board,
+        roads,
+        uncompletedRoadsPathDataMap,
+        coordinates,
+        'roads',
+        placedTileId,
+        newOrUpdatedPathIds,
+        placedFallower,
+      );
     }
 
     this.checkPathCompletion(uncompletedRoadsPathDataMap, room.board, newOrUpdatedPathIds);
@@ -60,11 +78,12 @@ export class PointCountingService {
     tileValuesKey: keyof TileValues,
     tileId: string,
     newOrUpdatedPathIds: Set<string>,
+    placedFallower?: FollowerDetails,
     pathIdFromPreviousTile?: string,
   ): void {
     citiesOrRoads.forEach((positionSet) => {
       if (positionSet.length >= 2) {
-        this.checkAndMergeNearestPaths(positionSet, coordinates, pathData, tileId);
+        this.checkAndMergeNearestPaths(positionSet, coordinates, pathData, tileId, placedFallower);
       } else {
         const position: Position = positionSet[0];
         const nextTile: ExtendedTile | null = this.extractNearestTile(board, coordinates, position);
@@ -81,7 +100,7 @@ export class PointCountingService {
         const nextTileCitiesOrRoads: [Position[]] | undefined = nextTile?.tileValuesAfterRotation?.[tileValuesKey];
 
         newOrUpdatedPathIds.add(pathId);
-        this.updatePathData(pathData, tileId, pathId, coordinates, position);
+        this.updatePathData(pathData, tileId, pathId, coordinates, placedFallower, position);
         if (nextTile && nextTileCitiesOrRoads && !isNextTileAlreadyChecked) {
           this.checkNextTile(
             board,
@@ -91,6 +110,7 @@ export class PointCountingService {
             tileValuesKey,
             nextTile.id,
             newOrUpdatedPathIds,
+            undefined,
             pathId,
           );
         }
@@ -103,6 +123,7 @@ export class PointCountingService {
     coordinates: Coordinates,
     pathDataMap: PathDataMap,
     tileId: string,
+    placedFallower?: FollowerDetails,
   ): void {
     const pathDataMapRecordArray: [string, PathData][] = [];
     positionSet.forEach((position) => {
@@ -113,23 +134,23 @@ export class PointCountingService {
       }
     });
     if (pathDataMapRecordArray.length >= 2) {
-      this.mergePaths(pathDataMapRecordArray, pathDataMap);
+      this.mergePaths(pathDataMapRecordArray, pathDataMap, placedFallower);
     }
     if (pathDataMapRecordArray.length === 1) {
       const pathId: string = pathDataMapRecordArray[0][0];
-      this.updatePathData(pathDataMap, tileId, pathId, coordinates, ...positionSet);
+      this.updatePathData(pathDataMap, tileId, pathId, coordinates, placedFallower, ...positionSet);
     }
   }
 
-  private mergePaths(pathDataMapRecordArray: [string, PathData][], pathDataMap: PathDataMap): void {
-    const mergedOwners: Set<string> = new Set();
+  private mergePaths(pathDataMapRecordArray: [string, PathData][], pathDataMap: PathDataMap, placedFallower?: FollowerDetails): void {
     const mergedCountedTiles: CountedTiles = new Map<string, CountedTile>();
+    let mergedOwners: string[] = [];
     let mergedPoints = 0;
     pathDataMapRecordArray.forEach(([pathId, pathData]) => {
       //Deleting merged paths
       pathDataMap.delete(pathId);
       //Merging owners
-      pathData.pathOwners.forEach((owner) => mergedOwners.add(owner));
+      mergedOwners = placedFallower?.username ? [...pathData.pathOwners, placedFallower.username] : pathData.pathOwners;
       //Merging tiles
       pathData.countedTiles.forEach((countedTile, tileId) => mergedCountedTiles.set(tileId, countedTile));
       //Merging points
@@ -196,17 +217,26 @@ export class PointCountingService {
   }
 
   private updatePathData(
-    pathData: PathDataMap,
+    pathDataMap: PathDataMap,
     tileId: string,
     pathId: string,
     coordinates: Coordinates,
+    placedFallower?: FollowerDetails,
     ...positions: Position[]
   ): void {
-    const updatedTile = pathData.get(pathId)?.countedTiles.get(tileId);
+    const searchedPathData = pathDataMap.get(pathId);
+    const fallowerOwner = placedFallower?.username;
+    if (searchedPathData && fallowerOwner) {
+      if (searchedPathData.pathOwners.some((pathOwner) => pathOwner !== fallowerOwner)) return;
+      searchedPathData.pathOwners.push(fallowerOwner);
+    }
+    const updatedTile = searchedPathData?.countedTiles.get(tileId);
     if (updatedTile) {
       positions.forEach((position) => updatedTile.checkedPositions.add(position));
     } else {
-      pathData.get(pathId)?.countedTiles?.set(tileId, { isPathCompleted: false, checkedPositions: new Set(positions), coordinates });
+      pathDataMap
+        .get(pathId)
+        ?.countedTiles?.set(tileId, { isPathCompleted: false, checkedPositions: new Set(positions), coordinates });
     }
   }
 
