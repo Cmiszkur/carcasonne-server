@@ -64,17 +64,24 @@ export class PointCountingService {
   ): void {
     citiesOrRoads.forEach((positionSet) => {
       if (positionSet.length >= 2) {
-        this.checkAndMergeNearestPaths(positionSet, coordinates, pathData);
+        this.checkAndMergeNearestPaths(positionSet, coordinates, pathData, tileId);
       } else {
         const position: Position = positionSet[0];
         const nextTile: ExtendedTile | null = this.extractNearestTile(board, coordinates, position);
-        console.log(position, pathIdFromPreviousTile, this.getPathId(pathData, nextTile));
+        console.log(
+          tileValuesKey,
+          position,
+          coordinates,
+          nextTile?.coordinates,
+          pathIdFromPreviousTile,
+          this.getPathId(pathData, nextTile),
+        );
         const pathId = pathIdFromPreviousTile || this.getPathId(pathData, nextTile) || this.initializePath(pathData);
         const isNextTileAlreadyChecked: boolean = this.isTileAlreadyChecked(pathId, pathData, position, nextTile?.id);
         const nextTileCitiesOrRoads: [Position[]] | undefined = nextTile?.tileValuesAfterRotation?.[tileValuesKey];
 
         newOrUpdatedPathIds.add(pathId);
-        this.updatePathData(pathData, tileId, pathId, position, coordinates);
+        this.updatePathData(pathData, tileId, pathId, coordinates, position);
         if (nextTile && nextTileCitiesOrRoads && !isNextTileAlreadyChecked) {
           this.checkNextTile(
             board,
@@ -91,7 +98,12 @@ export class PointCountingService {
     });
   }
 
-  private checkAndMergeNearestPaths(positionSet: Position[], coordinates: Coordinates, pathDataMap: PathDataMap): void {
+  private checkAndMergeNearestPaths(
+    positionSet: Position[],
+    coordinates: Coordinates,
+    pathDataMap: PathDataMap,
+    tileId: string,
+  ): void {
     const pathDataMapRecordArray: [string, PathData][] = [];
     positionSet.forEach((position) => {
       const nearestTileCoordinates: Coordinates | null = this.tilesService.getCorrespondingCoordinates(position, coordinates);
@@ -104,7 +116,8 @@ export class PointCountingService {
       this.mergePaths(pathDataMapRecordArray, pathDataMap);
     }
     if (pathDataMapRecordArray.length === 1) {
-      // Tutaj można połączyć ścieżkę z postawionym kafelkiem, skoro tylko jedna ze stron ma ścieżkę obok
+      const pathId: string = pathDataMapRecordArray[0][0];
+      this.updatePathData(pathDataMap, tileId, pathId, coordinates, ...positionSet);
     }
   }
 
@@ -133,16 +146,6 @@ export class PointCountingService {
   }
 
   private searchForPathWithGivenCoordinates(coordinates: Coordinates, pathDataMap: PathDataMap): [string, PathData] | null {
-    // let pathId: string | null = null;
-    // pathDataMap.forEach((pathData, currentPathId) => {
-    //   pathData.countedTiles.forEach((countedTile) => {
-    //     if (this.tilesService.checkCoordinates(countedTile.coordinates, coordinates)) {
-    //       pathId = currentPathId;
-    //     }
-    //   });
-    // });
-    // return pathId;
-
     return (
       Array.from(pathDataMap).find((array: [string, PathData]) => {
         return Array.from(array[1].countedTiles.values()).find((countedTile) => {
@@ -170,7 +173,6 @@ export class PointCountingService {
     positionSet.forEach((position) => {
       const nextTile = this.extractNearestTile(board, coordinates, position);
       isCompleted.push(!!nextTile);
-      console.log(position, !!nextTile);
     });
     return isCompleted.every(Boolean);
   }
@@ -193,12 +195,18 @@ export class PointCountingService {
     return pathId;
   }
 
-  private updatePathData(pathData: PathDataMap, tileId: string, pathId: string, position: Position, coordinates: Coordinates): void {
+  private updatePathData(
+    pathData: PathDataMap,
+    tileId: string,
+    pathId: string,
+    coordinates: Coordinates,
+    ...positions: Position[]
+  ): void {
     const updatedTile = pathData.get(pathId)?.countedTiles.get(tileId);
     if (updatedTile) {
-      updatedTile.checkedPositions.add(position);
+      positions.forEach((position) => updatedTile.checkedPositions.add(position));
     } else {
-      pathData.get(pathId)?.countedTiles?.set(tileId, { isPathCompleted: false, checkedPositions: new Set([position]), coordinates });
+      pathData.get(pathId)?.countedTiles?.set(tileId, { isPathCompleted: false, checkedPositions: new Set(positions), coordinates });
     }
   }
 
