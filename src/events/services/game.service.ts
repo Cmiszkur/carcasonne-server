@@ -1,11 +1,11 @@
-import { Coordinates, ExtendedTile, Tile } from '@tileModels';
+import { Coordinates, ExtendedTile, PathDataMap, Position, Tile } from '@tileModels';
 import { BasicService } from './basic.service';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
-import { Tiles, TileDocument } from '../schemas/tiles.schema';
-import { BoardMove, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
+import { TileDocument, Tiles } from '../schemas/tiles.schema';
+import { BoardMove, Paths, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
 import { CheckTilesService } from './check-tiles.service';
 import * as crypto from 'crypto';
 import { PointCountingService } from './point-counting.service';
@@ -40,6 +40,7 @@ export class GameService extends BasicService {
     const extendedStartingTile: ExtendedTile = this.getExtendedStartingTile(startingTile);
     searchedRoom.board.push(extendedStartingTile);
     searchedRoom.boardMoves.push(this.getStartingBoardMove());
+    searchedRoom.paths = this.getDefaultPaths(extendedStartingTile);
     searchedRoom.gameStarted = true;
 
     //Saving modified room and returns answer.
@@ -227,5 +228,27 @@ export class GameService extends BasicService {
   private removeFallowerFromPlayer(room: Room, username: string): void {
     const playerIndex: number = room.players.findIndex((p) => p.username === username);
     room.players[playerIndex].followers -= 1;
+  }
+
+  private getDefaultPaths(tile: ExtendedTile): Paths {
+    return {
+      cities: this.getDefaultPathDataMap(tile, [Position.RIGHT]),
+      roads: this.getDefaultPathDataMap(tile, [Position.TOP, Position.BOTTOM]),
+    };
+  }
+
+  private getDefaultPathDataMap(tile: ExtendedTile, positions: Position[]): PathDataMap {
+    return new Map([
+      [
+        crypto.randomUUID(),
+        {
+          pathOwners: [],
+          completed: false,
+          countedTiles: new Map([
+            [tile.id, { coordinates: tile.coordinates, checkedPositions: new Set(positions), isPathCompleted: false }],
+          ]),
+        },
+      ],
+    ]);
   }
 }
