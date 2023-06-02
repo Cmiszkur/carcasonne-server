@@ -14,19 +14,24 @@ import { Room } from '../schemas/room.schema';
 import { TilesService } from './tiles.service';
 import * as crypto from 'crypto';
 import { copy } from '../functions/copyObject';
-import { Paths } from '@roomModels';
+import { Paths, Player, PointCheckingAnswer } from '@roomModels';
 
 @Injectable()
 export class PointCountingService {
   constructor(private tilesService: TilesService) {}
 
-  public checkNewTile(room: Room, placedTile: ExtendedTile): Paths {
+  private get emptyPathData(): PathData {
+    return { countedTiles: new Map<string, CountedTile>(), pathOwners: [], completed: false, points: 0 };
+  }
+
+  public checkNewTile(room: Room, placedTile: ExtendedTile): PointCheckingAnswer {
     const copiedPlacedTile: ExtendedTile = copy(placedTile);
     const paths = room.paths;
     const uncompletedPaths = this.filterCompletedPaths(paths);
     const uncompletedRoadsPathDataMap: PathDataMap = uncompletedPaths.roads;
     const uncompletedCitiesPathDataMap: PathDataMap = uncompletedPaths.cities;
     const placedFallower: FollowerDetails | undefined = copiedPlacedTile.fallowerDetails;
+    const players: Player[] = room.players;
     const cities: [Position[]] | undefined = copiedPlacedTile.tileValuesAfterRotation?.cities;
     const roads: [Position[]] | undefined = copiedPlacedTile.tileValuesAfterRotation?.roads;
     const coordinates: Coordinates = copiedPlacedTile.coordinates;
@@ -69,7 +74,14 @@ export class PointCountingService {
     };
 
     this.logPaths(mergedPaths.roads, mergedPaths.cities);
-    return mergedPaths;
+    return {
+      paths: mergedPaths,
+      players: this.updatePlayersPoints(
+        new Map([...uncompletedPaths.cities, ...uncompletedPaths.roads]),
+        newOrUpdatedPathIds,
+        players,
+      ),
+    };
   }
 
   private checkNextTile(
@@ -122,6 +134,22 @@ export class PointCountingService {
     });
   }
 
+  private updatePlayersPoints(pathDataMap: PathDataMap, newOrUpdatedPathIds: Set<string>, players: Player[]): Player[] {
+    let copiedPlayers = copy(players);
+    newOrUpdatedPathIds.forEach((newOrUpdatedPathId) => {
+      const checkedPath = pathDataMap.get(newOrUpdatedPathId);
+      if (checkedPath) {
+        const checkedPathOwners = checkedPath.pathOwners || [];
+        copiedPlayers = copiedPlayers.map((player) => {
+          const addedPoints = checkedPath.points;
+          const playerWasPathOwner = checkedPathOwners.some((pathOwner) => pathOwner === player.username);
+          return { ...player, points: playerWasPathOwner ? player.points + addedPoints : player.points };
+        });
+      }
+    });
+    return copiedPlayers;
+  }
+
   private checkAndMergeNearestPaths(
     positionSet: Position[],
     coordinates: Coordinates,
@@ -142,7 +170,7 @@ export class PointCountingService {
     if (pathDataMapRecordArray.length >= 2) {
       this.mergePaths(pathDataMapRecordArray, pathDataMap, placedFallower);
     }
-    const pathId: string = pathDataMapRecordArray[0][0];
+    const pathId: string = pathDataMapRecordArray[0] ? pathDataMapRecordArray[0][0] : this.initializePath(pathDataMap);
     this.updatePathData(pathDataMap, tileId, pathId, coordinates, tileValuesKey, placedFallower, extraPoints, ...positionSet);
   }
 
@@ -216,7 +244,7 @@ export class PointCountingService {
    */
   private initializePath(pathData: PathDataMap): string {
     const pathId: string = crypto.randomUUID();
-    pathData.set(pathId, { countedTiles: new Map<string, CountedTile>(), pathOwners: [], completed: false, points: 0 });
+    pathData.set(pathId, this.emptyPathData);
     return pathId;
   }
 
@@ -243,8 +271,10 @@ export class PointCountingService {
     extraPoints = false,
     ...positions: Position[]
   ): void {
-    const basePoints = positions.length * (tileValuesKey === 'cities' ? 2 : 1);
-    searchedPathData.points += extraPoints ? basePoints * 2 : basePoints;
+    const isCities = tileValuesKey === 'cities';
+    const basePoints = positions.length * (isCities ? 2 : 1);
+    console.log('basePoints', basePoints, searchedPathData.points, extraPoints && isCities ? basePoints * 2 : basePoints, extraPoints);
+    searchedPathData.points += extraPoints && isCities ? basePoints * 2 : basePoints;
   }
 
   private setOrUpdateCountedTile(
@@ -295,19 +325,23 @@ export class PointCountingService {
     newOrUpdatedPathIds.forEach((newOrUpdatedPathId) => {
       const checkedPath = pathDataMap.get(newOrUpdatedPathId);
       if (checkedPath) {
-        const isCompleted: boolean[] = [];
-        const checkedPathTiles = Array.from(checkedPath.countedTiles.values());
-        checkedPathTiles.forEach((checkedPathTile) => {
-          const isTileCompleted: boolean = this.isTileCompleted(
-            Array.from(checkedPathTile.checkedPositions.values()),
-            board,
-            checkedPathTile.coordinates,
-          );
-          isCompleted.push(isTileCompleted);
-        });
-        checkedPath.completed = isCompleted.every(Boolean);
+        checkedPath.completed = this.checkAllTilesComplition(board, checkedPath);
       }
     });
+  }
+
+  private checkAllTilesComplition(board: ExtendedTile[], checkedPath: PathData): boolean {
+    const isCompleted: boolean[] = [];
+    const checkedPathTiles = Array.from(checkedPath.countedTiles.values());
+    checkedPathTiles.forEach((checkedPathTile) => {
+      const isTileCompleted: boolean = this.isTileCompleted(
+        Array.from(checkedPathTile.checkedPositions.values()),
+        board,
+        checkedPathTile.coordinates,
+      );
+      isCompleted.push(isTileCompleted);
+    });
+    return isCompleted.every(Boolean);
   }
 
   private logPaths(roadsPathDataMap: PathDataMap, citiesPathDataMap: PathDataMap): void {

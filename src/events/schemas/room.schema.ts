@@ -19,6 +19,7 @@ export class Room {
         },
         followers: { type: Number, min: 0, max: 6 },
         state: String,
+        points: Number,
       },
     ],
   })

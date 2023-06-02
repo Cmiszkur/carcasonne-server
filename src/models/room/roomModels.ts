@@ -28,6 +28,7 @@ export interface Player {
   color: string;
   followers: number;
   state: PlayerState;
+  points: number;
 }
 
 export enum PlayerState {
@@ -55,6 +56,11 @@ export interface TileAndPlayer {
 export interface Paths {
   cities: PathDataMap;
   roads: PathDataMap;
+}
+
+export interface PointCheckingAnswer {
+  paths: Paths;
+  players: Player[];
 }
 
 export type ShortenedRoom = Pick<Room, 'players' | 'numberOfPlayers' | 'roomHost' | 'roomId' | 'gameStarted' | 'gameEnded'>;

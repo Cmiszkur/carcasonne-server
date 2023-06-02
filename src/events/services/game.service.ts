@@ -5,7 +5,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Room, RoomDocument } from '../schemas/room.schema';
 import { TileDocument, Tiles } from '../schemas/tiles.schema';
-import { BoardMove, Paths, Player, RoomError, SocketAnswer, TilesSet } from '@roomModels';
+import { BoardMove, Paths, Player, PointCheckingAnswer, RoomError, SocketAnswer, TilesSet } from '@roomModels';
 import { CheckTilesService } from './check-tiles.service';
 import * as crypto from 'crypto';
 import { PointCountingService } from './point-counting.service';
@@ -84,7 +84,9 @@ export class GameService extends BasicService {
 
     // Check the point scoring for the new tile and update the paths accordingly
     const copiedSearchedRoom = copy(searchedRoom.toObject());
-    searchedRoom.paths = this.pointCountingService.checkNewTile(copiedSearchedRoom, extendedTile);
+    const pointCheckingAnswer: PointCheckingAnswer = this.pointCountingService.checkNewTile(copiedSearchedRoom, extendedTile);
+    searchedRoom.paths = pointCheckingAnswer.paths;
+    searchedRoom.players = pointCheckingAnswer.players;
 
     // Save the modified room and return an answer indicating success
     return this.saveRoom(searchedRoom);
@@ -232,19 +234,19 @@ export class GameService extends BasicService {
 
   private getDefaultPaths(tile: ExtendedTile): Paths {
     return {
-      cities: this.getDefaultPathDataMap(tile, [Position.RIGHT]),
+      cities: this.getDefaultPathDataMap(tile, [Position.RIGHT], true),
       roads: this.getDefaultPathDataMap(tile, [Position.TOP, Position.BOTTOM]),
     };
   }
 
-  private getDefaultPathDataMap(tile: ExtendedTile, positions: Position[]): PathDataMap {
+  private getDefaultPathDataMap(tile: ExtendedTile, positions: Position[], isCities = false): PathDataMap {
     return new Map([
       [
         crypto.randomUUID(),
         {
           pathOwners: [],
           completed: false,
-          points: positions.length * 2,
+          points: positions.length * (isCities ? 2 : 1),
           countedTiles: new Map([
             [tile.id, { coordinates: tile.coordinates, checkedPositions: new Set(positions), isPathCompleted: false }],
           ]),
