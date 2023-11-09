@@ -102,20 +102,13 @@ export class PointCountingService {
       } else {
         const position: Position = positionSet[0];
         const nextTile: ExtendedTile | null = this.extractNearestTile(board, coordinates, position);
-        console.log(
-          tileValuesKey,
-          position,
-          coordinates,
-          nextTile?.coordinates,
-          pathIdFromPreviousTile,
-          this.getPathId(pathData, nextTile),
-        );
         const pathId = pathIdFromPreviousTile || this.getPathId(pathData, nextTile) || this.initializePath(pathData);
         const isNextTileAlreadyChecked: boolean = this.isTileAlreadyChecked(pathId, pathData, position, nextTile?.id);
         const nextTileCitiesOrRoads: [Position[]] | undefined = nextTile?.tileValuesAfterRotation?.[tileValuesKey];
 
         newOrUpdatedPathIds.add(pathId);
         this.updatePathData(pathData, tileId, pathId, coordinates, tileValuesKey, placedFallower, extraPoints, position);
+        //TODO: To się chyba nigdy nie wykona, może do usunięcia.
         if (nextTile && nextTileCitiesOrRoads && !isNextTileAlreadyChecked) {
           this.checkNextTile(
             board,
@@ -160,17 +153,23 @@ export class PointCountingService {
     placedFallower?: FollowerDetails,
   ): void {
     const pathDataMapRecordArray: [string, PathData][] = [];
+
     positionSet.forEach((position) => {
       const nearestTileCoordinates: Coordinates | null = this.tilesService.getCorrespondingCoordinates(position, coordinates);
+
       if (nearestTileCoordinates) {
         const pathDataMapRecord = this.searchForPathWithGivenCoordinates(nearestTileCoordinates, pathDataMap);
+
         if (pathDataMapRecord) pathDataMapRecordArray.push(pathDataMapRecord);
       }
     });
+
     if (pathDataMapRecordArray.length >= 2) {
       this.mergePaths(pathDataMapRecordArray, pathDataMap, placedFallower);
     }
+
     const pathId: string = pathDataMapRecordArray[0] ? pathDataMapRecordArray[0][0] : this.initializePath(pathDataMap);
+
     this.updatePathData(pathDataMap, tileId, pathId, coordinates, tileValuesKey, placedFallower, extraPoints, ...positionSet);
   }
 

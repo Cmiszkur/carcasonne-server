@@ -72,7 +72,7 @@ export default class RoomService extends BasicService {
         if (!color) {
           return this.createAnswer(RoomError.MEEPLE_COLOR_NOT_SPECIFIED, null);
         }
-        const player: Player = { username, color, followers: 6, state: PlayerState.CONNECTED };
+        const player: Player = { username, color, followers: 6, state: PlayerState.CONNECTED, points: 0 };
         roomToJoin.players.push(player);
         roomToJoin.numberOfPlayers = roomToJoin.numberOfPlayers + 1;
         return this.saveRoom(roomToJoin);
@@ -187,6 +187,7 @@ export default class RoomService extends BasicService {
           color: color,
           followers: 6,
           state: PlayerState.CONNECTED,
+          points: 0,
         },
       ],
       board: [],
